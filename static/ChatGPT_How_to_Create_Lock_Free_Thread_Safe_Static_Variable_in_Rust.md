@@ -1,8 +1,6 @@
-[pvillela@gmail.com]
+**[pvillela]**
 
-*Show how to create a static variable in Rust that holds a data structure, can be read and written to by multiple threads, and uses lock-free atomic constructs instead mutexes or locks.*
-
-
+_Show how to create a static variable in Rust that holds a data structure, can be read and written to by multiple threads, and uses lock-free atomic constructs instead mutexes or locks._
 
 In Rust, you can use the `std::sync::atomic` module to create a static variable that can be read and written to by multiple threads using lock-free atomic constructs.
 
@@ -53,13 +51,9 @@ To read from the data structure, we use the `load` method on the `AtomicUsize` a
 
 Using an atomic reference counted pointer (`Arc`) and lock-free atomic operations ensures that the data structure can be safely shared between multiple threads without using mutexes or locks.
 
+**[pvillela]**
 
-
-[pvillela@gmail.com]
-
-*How can this be done without using unsafe code?*
-
-
+_How can this be done without using unsafe code?_
 
 It is possible to create a static variable in Rust that holds a data structure, can be read and written to by multiple threads, and uses lock-free atomic constructs without using `unsafe` code.
 
@@ -103,13 +97,9 @@ In this example, the `DATA_STRUCTURE` static variable is an `Arc<Mutex<DataStruc
 
 Using an atomic reference counted pointer (`Arc`) and a mutex ensures that the data structure can be safely shared and accessed by multiple threads without using `unsafe` code or lock-free atomic operations.
 
+**[pvillela]**
 
-
-[pvillela@gmail.com]
-
-*How can this be done without using unsafe code and without using locks?*
-
-
+_How can this be done without using unsafe code and without using locks?_
 
 It is possible to create a static variable in Rust that holds a data structure, can be read and written to by multiple threads, and uses lock-free atomic constructs without using `unsafe` code and without using locks.
 
@@ -155,13 +145,9 @@ In this example, the `DATA_STRUCTURE` static variable is an `Arc<AtomicPtr<DataS
 
 Using an atomic reference counted pointer (`Arc`) and an atomic pointer ensures that the data structure can be safely shared and accessed by multiple threads without using `unsafe` code or locks.
 
+**[pvillela]**
 
-
-[pvillela@gmail.com]
-
-*Modify the last example to also show an update to DATA_STRUCTURE.*
-
-
+_Modify the last example to also show an update to DATA_STRUCTURE._
 
 Here's an example of how to modify the previous example to also show an update to the `DATA_STRUCTURE` static variable:
 
@@ -209,4 +195,3 @@ fn main() {
 In this example, we update the `DATA_STRUCTURE` static variable by creating a new `DataStructure` instance and storing it in the atomic pointer using the `store` method. We pass the new pointer and the memory ordering `Release` to the `store` method to ensure that the update is visible to other threads.
 
 Note that this example uses `Box::into_raw` and `Box::new` to allocate and deallocate memory for the `DataStructure` instance. This is safe to do as long as the lifetime of the `DataStructure` instance is managed correctly. In particular, the `DataStructure` instance must not be deallocated while it is being used by other threads.
-

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use arc_swap::ArcSwap;
 use core::time::Duration;
 use once_cell::sync::Lazy;

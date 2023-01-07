@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use core::time::Duration;
 use std::sync::Mutex;
 use std::thread;

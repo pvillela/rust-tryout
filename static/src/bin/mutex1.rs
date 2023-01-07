@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use core::time::Duration;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;

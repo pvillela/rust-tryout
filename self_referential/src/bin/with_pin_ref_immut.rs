@@ -1,5 +1,5 @@
-// This is a modification of with_pin_ref_mut.rs, with most function parameters changed from passsing Pin
-// values to passing references of Pins of mutable references.
+// This is a modification of with_pin.rs, with most function parameters changed from passsing
+// references of Pins of mutable references to references of Pins of immutable references.
 
 use std::marker::PhantomPinned;
 use std::ops::Deref;
@@ -27,19 +27,19 @@ impl Test {
         this.b = self_ptr;
     }
 
-    fn a<'a>(self: &'a Pin<&'a mut Self>) -> &str {
+    fn a<'a>(self: &'a Pin<&'a Self>) -> &str {
         &self.a
     }
 
-    fn b(self: &Pin<&mut Self>) -> &String {
+    fn b(self: &Pin<&Self>) -> &String {
         unsafe { &*(self.b) }
     }
 
-    fn bp(self: &Pin<&mut Self>) -> *const String {
+    fn bp(self: &Pin<&Self>) -> *const String {
         self.b
     }
 
-    fn selfp(self: &Pin<&mut Self>) -> *const Test {
+    fn selfp(self: &Pin<&Self>) -> *const Test {
         self.deref()
     }
 }
@@ -49,11 +49,13 @@ fn main() {
     println!("address of var1: {:p}", &var1);
     let mut pin1 = unsafe { Pin::new_unchecked(&mut var1) };
     Test::init(pin1.as_mut());
+    let mut pin1: Pin<&Test> = pin1.as_ref();
 
     let mut var2 = Test::new("test2");
     println!("address of var2: {:p}", &var2);
     let mut pin2 = unsafe { Pin::new_unchecked(&mut var2) };
     Test::init(pin2.as_mut());
+    let mut pin2: Pin<&Test> = pin2.as_ref();
 
     println!("-- before swap");
 

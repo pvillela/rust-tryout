@@ -77,7 +77,10 @@ fn main() {
     // It tries to swap the targets of pin1 and pin2, and does not compile.
     // std::mem::swap(&mut pin1.get_mut(), &mut pin2.get_mut());
 
-    // The line below, replacing the above commented-out line, compiles fine.
+    // The following line is another way to try to swap the targets, but it also doesn't compile.
+    // std::mem::swap(&mut *pin1, &mut *pin2);
+
+    // The line below, replacing the earlier original commented-out line, compiles fine.
     // It swaps the Pin containers instead of the wrapped target values.
     // After the swap, pin1's and pin2's addresses remain unchanges but their contents get swapped:
     std::mem::swap(&mut pin1, &mut pin2);

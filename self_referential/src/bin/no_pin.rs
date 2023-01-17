@@ -5,9 +5,9 @@ struct Test {
 }
 
 impl Test {
-    fn new(tat: &str) -> Self {
+    fn new(text: &str) -> Self {
         Test {
-            a: String::from(tat),
+            a: String::from(text),
             b: std::ptr::null(),
         }
     }

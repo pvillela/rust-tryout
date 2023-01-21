@@ -1,12 +1,12 @@
 // Based on the last code example in https://cfsamson.github.io/books-futures-explained/5_pin.html.
+// Modified generator.rs to introduce parameter for GeneratorA::start.
 
-// #![feature(auto_traits, negative_impls)] // needed to implement `!Unpin`
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 
 pub fn main() {
-    let gen1 = GeneratorA::start();
-    let gen2 = GeneratorA::start();
+    let gen1 = GeneratorA::start("Gen1");
+    let gen2 = GeneratorA::start("Generator2");
     // Before we pin the data, this is safe to do
     // std::mem::swap(&mut gen, &mut gen2);
 
@@ -33,12 +33,9 @@ pub fn main() {
         println!("Gen2 got value {}", n);
     };
 
-    // This won't work:
-    // std::mem::swap(&mut gen1, &mut gen2);
-    // This will work but will just swap the pointers so nothing bad happens here:
-    // std::mem::swap(&mut pinned1, &mut pinned2);
-
+    println!("pinned1.as_mut().resume():");
     let _ = pinned1.as_mut().resume();
+    println!("pinned2.as_mut().resume():");
     let _ = pinned2.as_mut().resume();
 }
 
@@ -53,8 +50,8 @@ trait Generator {
     fn resume(self: Pin<&mut Self>) -> GeneratorState<Self::Yield, Self::Return>;
 }
 
-enum GeneratorA {
-    Enter,
+enum GeneratorA<'a> {
+    Enter(&'a str),
     Yield1 {
         to_borrow: String,
         borrowed: *const String,
@@ -63,29 +60,21 @@ enum GeneratorA {
     _Phantom(PhantomPinned),
 }
 
-impl GeneratorA {
-    fn start() -> Self {
-        GeneratorA::Enter
+impl<'a> GeneratorA<'a> {
+    fn start(s: &'a str) -> Self {
+        GeneratorA::Enter(s)
     }
 }
 
-// This tells us that this object is not safe to move after pinning.
-// In this case, only we as implementors "feel" this, however, if someone is
-// relying on our Pinned data this will prevent them from moving it. You need
-// to enable the feature flag `#![feature(optin_builtin_traits)]` and use the
-// nightly compiler to implement `!Unpin`. Normally, you would use
-// `std::marker::PhantomPinned` to indicate that the struct is `!Unpin`.
-// impl !Unpin for GeneratorA {}
-
-impl Generator for GeneratorA {
+impl<'a> Generator for GeneratorA<'a> {
     type Yield = usize;
     type Return = ();
     fn resume(self: Pin<&mut Self>) -> GeneratorState<Self::Yield, Self::Return> {
         // lets us get ownership over current state
         let this = unsafe { self.get_unchecked_mut() };
         match this {
-            GeneratorA::Enter => {
-                let to_borrow = String::from("Hello");
+            GeneratorA::Enter(s) => {
+                let to_borrow = s.to_owned();
                 let borrowed = &to_borrow;
                 let res = borrowed.len();
                 *this = GeneratorA::Yield1 {
@@ -108,9 +97,12 @@ impl Generator for GeneratorA {
                 GeneratorState::Yielded(res)
             }
 
-            GeneratorA::Yield1 { borrowed, .. } => {
+            GeneratorA::Yield1 {
+                to_borrow,
+                borrowed,
+            } => {
                 let borrowed: &String = unsafe { &**borrowed };
-                println!("{} world", borrowed);
+                println!("{} world (to_borrow={})", borrowed, to_borrow);
                 *this = GeneratorA::Exit;
                 GeneratorState::Complete(())
             }

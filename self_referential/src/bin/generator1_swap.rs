@@ -1,6 +1,5 @@
-// Based on the last code example in https://cfsamson.github.io/books-futures-explained/5_pin.html.
-// This example modifies generator1.rs to demonstrate unsafe swapping of heap-allocated generator
-// structs wrapped by a Pin.
+//! This example modifies generator1.rs to demonstrate unsafe swapping of heap-allocated generator
+//! structs wrapped by a Pin.
 
 use std::marker::PhantomPinned;
 use std::pin::Pin;

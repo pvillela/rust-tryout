@@ -1,4 +1,4 @@
-// Based on the last code example in https://cfsamson.github.io/books-futures-explained/5_pin.html.
+//! Based on the last code example in https://cfsamson.github.io/books-futures-explained/5_pin.html.
 
 // #![feature(auto_traits, negative_impls)] // needed to implement `!Unpin`
 use std::marker::PhantomPinned;

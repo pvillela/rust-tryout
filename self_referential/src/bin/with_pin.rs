@@ -1,4 +1,4 @@
-// This is a modification of the Pin eaample in https://cfsamson.github.io/books-futures-eaplained/5_pin.html.
+//! This is a modification of the Pin eaample in https://cfsamson.github.io/books-futures-eaplained/5_pin.html.
 
 use std::marker::PhantomPinned;
 use std::pin::Pin;

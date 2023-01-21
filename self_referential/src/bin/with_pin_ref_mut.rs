@@ -1,5 +1,5 @@
-// This is a modification of with_pin_ref_mut.rs, with most function parameters changed from passsing Pin
-// values to passing references of Pins of mutable references.
+//! This is a modification of with_pin_ref_mut.rs, with most function parameters changed from passsing Pin
+//! values to passing references of Pins of mutable references.
 
 use std::marker::PhantomPinned;
 use std::ops::Deref;

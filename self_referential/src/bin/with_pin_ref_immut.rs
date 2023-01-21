@@ -1,5 +1,5 @@
-// This is a modification of with_pin.rs, with most function parameters changed from passsing
-// references of Pins of mutable references to references of Pins of immutable references.
+//! This is a modification of with_pin.rs, with most function parameters changed from passsing
+//! references of Pins of mutable references to references of Pins of immutable references.
 
 use std::marker::PhantomPinned;
 use std::ops::Deref;

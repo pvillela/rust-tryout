@@ -1,5 +1,4 @@
-// Based on the last code example in https://cfsamson.github.io/books-futures-explained/5_pin.html.
-// Modified generator.rs to introduce parameter for GeneratorA::start.
+//! Modified generator.rs to introduce parameter for GeneratorA::start.
 
 use std::marker::PhantomPinned;
 use std::pin::Pin;

@@ -1,3 +1,5 @@
+//! Based on one of the examples at https://cfsamson.github.io/books-futures-explained/5_pin.html.
+
 #[derive(Debug)]
 struct Test {
     a: String,

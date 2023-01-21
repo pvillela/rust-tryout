@@ -26,11 +26,11 @@ pub fn main() {
     //let mut pinned2 = unsafe { Pin::new_unchecked(&mut gen2) };
 
     if let GeneratorState::Yielded(n) = pinned1.as_mut().resume() {
-        println!("Gen1 got value {}", n);
+        println!("Result from pinned1.as_mut().resume(): {}", n);
     }
 
     if let GeneratorState::Yielded(n) = pinned2.as_mut().resume() {
-        println!("Gen2 got value {}", n);
+        println!("Result from pinned2.as_mut().resume(): {}", n);
     };
 
     println!("pinned1.as_mut().resume():");

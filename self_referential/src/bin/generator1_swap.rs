@@ -17,27 +17,23 @@ pub fn main() {
     let g2: *mut GeneratorA = &mut *box2;
     let mut pinned2 = unsafe { Pin::new_unchecked(box2) };
 
+    // Print the generator states upon start.
+    println!("Generator states upon start.");
+    dump_raw(g1, "g1");
+    dump_raw(g2, "g2");
+
+    // Execute resume() on generators.
+    println!("Executing resume() on generators.");
     if let GeneratorState::Yielded(n) = pinned1.as_mut().resume() {
-        println!("Gen1 got value {}", n);
+        println!("Result from pinned1.as_mut().resume(): {}", n);
     }
 
     if let GeneratorState::Yielded(n) = pinned2.as_mut().resume() {
-        println!("Gen2 got value {}", n);
+        println!("Result from pinned2.as_mut().resume(): {}", n);
     };
 
-    // Prints the pointer address (twice) and the data pointed to by a raw pointer to a GeneratorA object.
-    fn dump_raw(g: *const GeneratorA, name: &str) {
-        unsafe {
-            println!(
-                "{name}: {:p} {:?} {:?}",
-                g,
-                g,
-                g.as_ref().as_deref().unwrap()
-            );
-        }
-    }
-
     // Print the generator states before swapping them.
+    println!("Generator states after resume(), before swap.");
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 
@@ -47,18 +43,20 @@ pub fn main() {
     println!("Swapped g1 and g2");
 
     // Print the generator states after swapping them.
+    println!("Generator states after swap.");
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 
     // Resume the swapped generators.
     println!("Resuming the swapped generators");
-    println!("pinned1.as_mut().resume():");
+    println!("Executed pinned1.as_mut().resume():");
     let _ = pinned1.as_mut().resume();
-    println!("pinned2.as_mut().resume():");
+    println!("Executed pinned2.as_mut().resume():");
     let _ = pinned2.as_mut().resume();
 
     // Print the updated generator states. Notice that g1 and g2 continue to point to the swapped generators
     // but they are now in the Exit state.
+    println!("Updated generator states:");
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 }
@@ -128,7 +126,7 @@ impl<'a> Generator for GeneratorA<'a> {
             } => {
                 let borrowed = unsafe { &**borrowed };
                 println!(
-                    "borrowed={:p}, to_borrow={}, address of to_borrow={:p})",
+                    "Yield1 state: borrowed={:p}, to_borrow={}, address of to_borrow={:p})",
                     borrowed, to_borrow, to_borrow
                 );
 
@@ -146,5 +144,17 @@ impl<'a> Generator for GeneratorA<'a> {
 
             GeneratorA::_Phantom(_) => panic!("Unreachable code."),
         }
+    }
+}
+
+// Prints the pointer address (twice) and the data pointed to by a raw pointer to a GeneratorA object.
+fn dump_raw(g: *const GeneratorA, name: &str) {
+    unsafe {
+        println!(
+            "{name}: {:p} {:?} {:?}",
+            g,
+            g,
+            g.as_ref().as_deref().unwrap()
+        );
     }
 }

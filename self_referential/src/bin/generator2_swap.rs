@@ -1,5 +1,4 @@
-//! This example modifies generator1.rs to demonstrate unsafe swapping of heap-allocated generator
-//! structs wrapped by a Pin.
+//! This example modifies generator1_swap.rs to add a second yield state to the generators.
 
 use std::marker::PhantomPinned;
 use std::pin::Pin;
@@ -21,8 +20,8 @@ pub fn main() {
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 
-    // Execute resume() on generators.
-    println!("Executing resume() on generators.");
+    // Execute first resume() on generators.
+    println!("Executing first resume() on generators.");
     if let GeneratorState::Yielded(n) = pinned1.as_mut().resume() {
         println!("Result from pinned1.as_mut().resume(): {}", n);
     }
@@ -31,8 +30,8 @@ pub fn main() {
         println!("Result from pinned2.as_mut().resume(): {}", n);
     };
 
-    // Print the generator states before swapping them.
-    println!("Generator states after resume(), before swap.");
+    // Print the generator states after first resume(), before swapping them.
+    println!("Generator states after first resume(), before swap.");
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 
@@ -46,8 +45,23 @@ pub fn main() {
     dump_raw(g1, "g1");
     dump_raw(g2, "g2");
 
-    // Resume the swapped generators.
-    println!("Resuming the swapped generators");
+    // Execute second resume() on generators.
+    println!("Executing second resume() on generators.");
+    if let GeneratorState::Yielded(n) = pinned1.as_mut().resume() {
+        println!("Result from pinned1.as_mut().resume(): {}", n);
+    }
+
+    if let GeneratorState::Yielded(n) = pinned2.as_mut().resume() {
+        println!("Result from pinned2.as_mut().resume(): {}", n);
+    };
+
+    // Print the generator states after second resume().
+    println!("Generator states after second resume().");
+    dump_raw(g1, "g1");
+    dump_raw(g2, "g2");
+
+    // Execute final resume() on generators.
+    println!("Executing final resume() on generators.");
     println!("Executed pinned1.as_mut().resume():");
     let _ = pinned1.as_mut().resume();
     println!("Executed pinned2.as_mut().resume():");
@@ -78,6 +92,7 @@ enum GeneratorA<'a> {
         to_borrow: String,
         borrowed: *const String,
     },
+    Yield2(String),
     Exit,
     _Phantom(PhantomPinned),
 }
@@ -136,6 +151,14 @@ impl<'a> Generator for GeneratorA<'a> {
                 // Exit.
                 // println!("   *borrowed={}", borrowed);
 
+                let s = to_borrow.to_owned() + to_borrow;
+                let res = s.len();
+                *this = GeneratorA::Yield2(s);
+                GeneratorState::Yielded(res)
+            }
+
+            GeneratorA::Yield2(s) => {
+                println!("Just before transition, currently in Yield2 state: {}", s);
                 *this = GeneratorA::Exit;
                 GeneratorState::Complete(())
             }

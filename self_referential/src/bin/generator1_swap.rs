@@ -25,7 +25,7 @@ pub fn main() {
         println!("Gen2 got value {}", n);
     };
 
-    // Prints the data pointed by a raw pointer to a generator object.
+    // Prints the pointer address (twice) and the data pointed to by a raw pointer to a GeneratorA object.
     fn dump_raw(g: *const GeneratorA, name: &str) {
         unsafe {
             println!(
@@ -131,8 +131,13 @@ impl<'a> Generator for GeneratorA<'a> {
                     "borrowed={:p}, to_borrow={}, address of to_borrow={:p})",
                     borrowed, to_borrow, to_borrow
                 );
-                // Line below causes segmentation fault when executing pinned2.as_mut().resume() if uncommented.
+
+                // Commented line below causes segmentation fault when executing pinned2.as_mut().resume() if uncommented.
+                // The reason for that is that the `borrowed` pointer is pointing to an address that previously
+                // contained the string "Gen1" but now has been overwritten as the state of g1 has changed from Yield1 to
+                // Exit.
                 // println!("   *borrowed={}", borrowed);
+
                 *this = GeneratorA::Exit;
                 GeneratorState::Complete(())
             }

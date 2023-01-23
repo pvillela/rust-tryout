@@ -13,6 +13,10 @@ name = "flatten_submodules"
 version = "0.1.0"
 
 [[package]]
+name = "futures_in_200_lines"
+version = "0.1.0"
+
+[[package]]
 name = "general"
 version = "0.1.0"
 

@@ -22,9 +22,9 @@ pub struct MyWaker {
 // reactor.
 #[derive(Clone)]
 pub struct Task {
-    id: usize,
     reactor: Arc<Mutex<Reactor>>,
     data: u64,
+    id: usize,
 }
 
 // These are function definitions we'll use for our waker. Remember the
@@ -68,7 +68,7 @@ pub fn mywaker_into_waker(s: *const MyWaker) -> Waker {
 
 impl Task {
     pub fn new(reactor: Arc<Mutex<Reactor>>, data: u64, id: usize) -> Self {
-        Task { id, reactor, data }
+        Task { reactor, id, data }
     }
 }
 
@@ -79,7 +79,7 @@ impl Future for Task {
     // Poll is the what drives the state machine forward and it's the only
     // method we'll need to call to drive futures to completion.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // We need to get access the reactor in our `poll` method so we acquire
+        // We need to access the reactor in our `poll` method so we acquire
         // a lock on that.
         let mut r = self.reactor.lock().unwrap();
 
@@ -109,7 +109,7 @@ impl Future for Task {
 
         // Note that we're holding a lock on the `Mutex` which protects the
         // Reactor all the way until the end of this scope. This means that
-        // even if our task were to complete immidiately, it will not be
+        // even if our task were to complete immediately, it will not be
         // able to call `wake` while we're in our `Poll` method.
 
         // Since we can make this guarantee, it's now the Executors job to

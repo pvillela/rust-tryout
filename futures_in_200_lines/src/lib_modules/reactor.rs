@@ -45,13 +45,13 @@ impl Reactor {
     // 1. We know that only thread-safe reactors will be created.
     // 2. By heap allocating it we can obtain a reference to a stable address
     // that's not dependent on the stack frame of the function that called `new`
-    pub fn new() -> Arc<Mutex<Box<Self>>> {
+    pub fn new() -> Arc<Mutex<Self>> {
         let (tx, rx) = channel::<Event>();
-        let reactor = Arc::new(Mutex::new(Box::new(Reactor {
+        let reactor = Arc::new(Mutex::new(Reactor {
             dispatcher: tx,
             handle: None,
             tasks: HashMap::new(),
-        })));
+        }));
 
         // Notice that we'll need to use `weak` reference here. If we don't,
         // our `Reactor` will not get `dropped` when our main thread is finished

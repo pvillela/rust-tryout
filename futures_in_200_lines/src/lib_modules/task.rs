@@ -23,7 +23,7 @@ pub struct MyWaker {
 #[derive(Clone)]
 pub struct Task {
     id: usize,
-    reactor: Arc<Mutex<Box<Reactor>>>,
+    reactor: Arc<Mutex<Reactor>>,
     data: u64,
 }
 
@@ -67,7 +67,7 @@ pub fn mywaker_into_waker(s: *const MyWaker) -> Waker {
 }
 
 impl Task {
-    pub fn new(reactor: Arc<Mutex<Box<Reactor>>>, data: u64, id: usize) -> Self {
+    pub fn new(reactor: Arc<Mutex<Reactor>>, data: u64, id: usize) -> Self {
         Task { id, reactor, data }
     }
 }

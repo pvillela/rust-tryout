@@ -30,6 +30,9 @@ pub struct Task {
 // These are function definitions we'll use for our waker. Remember the
 // "Trait Objects" chapter earlier.
 fn mywaker_wake(s: &MyWaker) {
+    // Wny don't we just do `s.thread.unpark();` instead of all the lines below?
+    // the reason is that we need to decrement the arc smart pointer's reference
+    // count, which happens when the arc is dropped at the end of the scope.
     let waker_ptr: *const MyWaker = s;
     let waker_arc = unsafe { Arc::from_raw(waker_ptr) };
     waker_arc.thread.unpark();

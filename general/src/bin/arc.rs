@@ -23,6 +23,7 @@ fn main() {
         // let y = x; // doesn't compile because x was moved
 
         arc_ptr_dump(ax.clone(), "ax.clone() in thread t1");
+        arc_ptr_dump1(&ax, "ax ...... in thread t1");
 
         println!(
             "Pointer values of -- ax: {:p}, &ax: {:p}, *ax: n/a, &*ax: {:p}, ax.deref(): {:p}, &ax.deref(): {:p}",
@@ -69,7 +70,8 @@ fn main() {
 
     let t2 = t1.join();
     let ax = t2.unwrap().join().unwrap();
-    arc_ptr_dump(ax.clone(), "ax in thrad main");
+    arc_ptr_dump(ax.clone(), "ax.clone() in thread main");
+    arc_ptr_dump1(&ax, "ax ...... in thread main");
     println!("{:?}", ax.s);
 }
 
@@ -85,6 +87,18 @@ fn arc_ptr_dump<T>(a: Arc<T>, name: &str) {
     let ap: usize = arc_target_address(&a);
     println!(
         "arc_ptr_dump for {name} -- a: {:p}, &a: {:p}, ra: {:p}, rt: {:p}, da: {:p}, ap: {:x}",
+        a, &a, ra, rt, da, ap
+    );
+}
+
+fn arc_ptr_dump1<T>(ra: &Arc<T>, name: &str) {
+    // let ra: &Arc<T> = a1;
+    let a = ra.clone();
+    let rt: &T = &ra;
+    let da: &T = ra.deref();
+    let ap: usize = arc_target_address(ra);
+    println!(
+        "arc_ptr_dump1 for {name} -- a: {:p}, &a: {:p}, ra: {:p}, rt: {:p}, da: {:p}, ap: {:x}",
         a, &a, ra, rt, da, ap
     );
 }

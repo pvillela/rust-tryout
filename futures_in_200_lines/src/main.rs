@@ -18,12 +18,16 @@ fn main() {
     // an `async` block works the same way as an `async fn` in that it compiles
     // our code into a state machine, `yielding` at every `await` point.
     let fut1 = async {
+        println!("fut1 in state 1");
         let val = task1.await;
+        println!("fut1 in state 2");
         println!("Got {} at time: {:.2}.", val, start.elapsed().as_secs_f32());
     };
 
     let fut2 = async {
+        println!("fut2 in state 1");
         let val = task2.await;
+        println!("fut2 in state 2");
         println!("Got {} at time: {:.2}.", val, start.elapsed().as_secs_f32());
     };
 
@@ -31,8 +35,11 @@ fn main() {
     // though. You have a set of operations containing many futures that
     // ends up as a single future that drives them all to completion.
     let mainfut = async {
+        println!("mainfut in state 1");
         fut1.await;
+        println!("mainfut in state 2");
         fut2.await;
+        println!("mainfut in state 3");
     };
 
     // This executor will block the main thread until the futures are resolved

@@ -9,6 +9,7 @@ use std::{
 
 // Our executor takes any object which implements the `Future` trait
 pub fn block_on<F: Future>(mut future: F) -> F::Output {
+    println!("block_on called.");
     // the first thing we do is to construct a `Waker` which we'll pass on to
     // the `reactor` so it can wake us up when an event is ready.
     let mywaker = Arc::new(MyWaker {

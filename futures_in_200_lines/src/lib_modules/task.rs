@@ -30,6 +30,7 @@ pub struct Task {
 // These are function definitions we'll use for our waker. Remember the
 // "Trait Objects" chapter earlier.
 fn mywaker_wake(s: &MyWaker) {
+    println!("MyWaker awoken.");
     // Wny don't we just do `s.thread.unpark();` instead of all the lines below?
     // the reason is that we need to decrement the arc smart pointer's reference
     // count, which happens when the arc is dropped at the end of the scope.
@@ -79,12 +80,14 @@ impl Future for Task {
     // Poll is the what drives the state machine forward and it's the only
     // method we'll need to call to drive futures to completion.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        println!("Polling task id {}", self.id);
         // We need to access the reactor in our `poll` method so we acquire
         // a lock on that.
         let mut r = self.reactor.lock().unwrap();
 
         // First we check if the task is marked as ready
         if r.is_ready(self.id) {
+            println!("Task id {} is ready", self.id);
             // If it's ready we set its state to `Finished`
             *r.tasks.get_mut(&self.id).unwrap() = TaskState::Finished;
             Poll::Ready(self.id)
@@ -92,6 +95,7 @@ impl Future for Task {
         // If it isn't finished we check the map we have stored in our Reactor
         // over id's we have registered and see if it's there
         } else if r.tasks.contains_key(&self.id) {
+            println!("Task id {} was already in task map and is pending", self.id);
             // This is important. The docs says that on multiple calls to poll,
             // only the Waker from the Context passed to the most recent call
             // should be scheduled to receive a wakeup. That's why we insert
@@ -101,6 +105,10 @@ impl Future for Task {
                 .insert(self.id, TaskState::NotReady(cx.waker().clone()));
             Poll::Pending
         } else {
+            println!(
+                "Task id {} being inserted in task map and is pending",
+                self.id
+            );
             // If it's not ready, and not in the map it's a new task so we
             // register that with the Reactor and return `Pending`
             r.register(self.data, cx.waker().clone(), self.id);

@@ -101,6 +101,7 @@ impl Reactor {
     // The wake function will call wake on the waker for the task with the
     // corresponding id.
     pub fn wake(&mut self, id: usize) {
+        println!("Reactor::wake for id {}", id);
         self.tasks
             .get_mut(&id)
             .map(|state| {
@@ -117,8 +118,9 @@ impl Reactor {
     }
 
     // Register a new task with the reactor. In this particular example
-    // we panic if a task with the same id get's registered twice
+    // we panic if a task with the same id gets registered twice
     pub fn register(&mut self, duration: u64, waker: Waker, id: usize) {
+        println!("Reactor::register for id {}", id);
         if self.tasks.insert(id, TaskState::NotReady(waker)).is_some() {
             panic!("Tried to insert a task with id: '{}', twice!", id);
         }
@@ -127,6 +129,7 @@ impl Reactor {
 
     // We simply checks if a task with this id is in the state `TaskState::Ready`
     pub fn is_ready(&self, id: usize) -> bool {
+        println!("Reactor::is_ready called for id {}", id);
         self.tasks
             .get(&id)
             .map(|state| match state {

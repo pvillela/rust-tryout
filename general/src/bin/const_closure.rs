@@ -1,10 +1,10 @@
 /// Transforms a value into a nullary closure that returns the value.
-fn const_closure<T: 'static + Clone>(x: T) -> impl Fn() -> T {
+fn const_closure<T: Clone>(x: T) -> impl Fn() -> T {
     move || x.clone()
 }
 
 /// Transforms a value into a nullary closure that returns the value but can only be called once.
-fn const_once_closure<T: 'static>(x: T) -> impl FnOnce() -> T {
+fn const_once_closure<T>(x: T) -> impl FnOnce() -> T {
     move || x
 }
 

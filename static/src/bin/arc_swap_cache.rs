@@ -4,6 +4,7 @@ use arc_swap::{ArcSwap, Cache};
 use lazy_static::__Deref;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 #[allow(unused)]
@@ -30,6 +31,6 @@ fn main() {
         println!("{:?}", c.borrow_mut().load());
     });
 
-    let foo = CACHE.with(|c| c.borrow_mut().load().foo.clone());
+    let foo = CACHE.with(|c| Rc::new(c.borrow_mut().load().foo.clone()));
     println!("{}", foo);
 }

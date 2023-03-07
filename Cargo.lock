@@ -138,6 +138,7 @@ dependencies = [
  "anyhow",
  "once_cell",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

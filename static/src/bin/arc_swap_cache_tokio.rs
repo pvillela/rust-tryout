@@ -54,7 +54,7 @@ async fn main() {
     //         // sleep(Duration::from_millis(0)).await;
 
     //         let x = c.borrow_mut().load().foo.clone();
-    //         Rc::new(x.clone())
+    //         Arc::new(Rc::new(x.clone()))
     //     });
     //     println!("{}", x);
     //     x

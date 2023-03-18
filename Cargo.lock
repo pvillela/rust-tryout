@@ -136,6 +136,7 @@ name = "general"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arc-swap",
  "once_cell",
  "thiserror",
  "tokio",

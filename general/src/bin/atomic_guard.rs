@@ -3,23 +3,23 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub struct AtomicGuard<T: Clone> {
+pub struct AtomicGuard<'a, T> {
     exists: AtomicBool,
-    value: Option<T>, // guaranteed not to be None when exists is true
+    reference: &'a mut Option<T>, // guaranteed not to be None when exists is true
 }
 
-impl<T: Clone> AtomicGuard<T> {
+impl<'a, T> AtomicGuard<'a, T> {
     /// Returns Option containing value if it is visible, None otherwise.
-    pub fn try_get(&self) -> Option<T> {
+    pub fn try_get(&'a self) -> Option<&'a T> {
         if self.exists.load(Ordering::Acquire) {
-            self.value.clone()
+            self.reference.as_ref()
         } else {
             None
         }
     }
 
     /// Waits in a spin-lock to get value until it is visible or timeout expires.
-    pub fn get_with_timeout(&self, timeout: Duration) -> Option<T> {
+    pub fn get_with_timeout(&'a self, timeout: Duration) -> Option<&'a T> {
         let current = Instant::now();
         while !self.exists.load(Ordering::Acquire) {
             std::hint::spin_loop();
@@ -27,21 +27,21 @@ impl<T: Clone> AtomicGuard<T> {
                 return None;
             }
         }
-        self.value.clone()
+        self.reference.as_ref()
     }
 
     /// Gets the value if initialized, panics otherwise.
-    pub fn get(&self) -> T {
+    pub fn get(&'a self) -> &'a T {
         let _ = self
             .exists
             .compare_exchange(true, true, Ordering::Acquire, Ordering::Relaxed);
-        self.value.clone().unwrap()
+        self.reference.as_ref().unwrap()
     }
 
-    pub const fn new() -> Self {
+    pub fn new(reference: &'a mut Option<T>) -> Self {
         Self {
             exists: AtomicBool::new(false),
-            value: None,
+            reference,
         }
     }
 
@@ -52,13 +52,15 @@ impl<T: Clone> AtomicGuard<T> {
         if swap.is_err() {
             return Err(());
         }
-        self.value = Some(value);
+        *self.reference = Some(value);
         Ok(())
     }
 }
 
+static mut VALUE: Option<String> = None;
+
 fn main() {
-    let mut ag = AtomicGuard::<String>::new();
+    let mut ag = unsafe { AtomicGuard::new(&mut VALUE) };
     println!("{:?}", ag.try_get());
     println!("{:?}", ag.get_with_timeout(Duration::from_millis(10)));
     assert!(ag.init("foo".to_owned()).is_ok());

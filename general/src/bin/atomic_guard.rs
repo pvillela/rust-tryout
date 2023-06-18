@@ -9,7 +9,7 @@ pub struct AtomicGuard<T: Clone> {
 }
 
 impl<T: Clone> AtomicGuard<T> {
-    /// Returns Option containing value if it is vilible, None otherwise.
+    /// Returns Option containing value if it is visible, None otherwise.
     pub fn try_get(&self) -> Option<T> {
         if self.exists.load(Ordering::Acquire) {
             self.value.clone()
@@ -22,6 +22,7 @@ impl<T: Clone> AtomicGuard<T> {
     pub fn get_with_timeout(&self, timeout: Duration) -> Option<T> {
         let current = Instant::now();
         while !self.exists.load(Ordering::Acquire) {
+            std::hint::spin_loop();
             if current.elapsed().gt(&timeout) {
                 return None;
             }
@@ -29,13 +30,16 @@ impl<T: Clone> AtomicGuard<T> {
         self.value.clone()
     }
 
-    /// Waits forever a spin-lock to get value until it is visible.
+    /// Gets the value if initialized, panics otherwise.
     pub fn get(&self) -> T {
-        self.get_with_timeout(Duration::MAX).unwrap()
+        let _ = self
+            .exists
+            .compare_exchange(true, true, Ordering::Acquire, Ordering::Relaxed);
+        self.value.clone().unwrap()
     }
 
-    pub fn new() -> AtomicGuard<T> {
-        AtomicGuard {
+    pub const fn new() -> Self {
+        Self {
             exists: AtomicBool::new(false),
             value: None,
         }
@@ -45,7 +49,7 @@ impl<T: Clone> AtomicGuard<T> {
         let swap = self
             .exists
             .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed);
-        if !swap.is_ok() {
+        if swap.is_err() {
             return Err(());
         }
         self.value = Some(value);

@@ -1,6 +1,5 @@
 use std::rc::Rc;
 use std::time::Duration;
-use tokio;
 use tokio::time::sleep;
 
 async fn foo(x: String) {

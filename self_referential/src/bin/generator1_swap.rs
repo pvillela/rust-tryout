@@ -37,7 +37,7 @@ pub fn main() {
     dump_raw(g2, "g2");
 
     unsafe {
-        std::mem::swap(&mut *g1, &mut *g2);
+        core::ptr::swap(g1, g2);
     }
     println!("Swapped g1 and g2");
 
@@ -150,11 +150,6 @@ impl<'a> Generator for GeneratorA<'a> {
 // Prints the pointer address (twice) and the data pointed to by a raw pointer to a GeneratorA object.
 fn dump_raw(g: *const GeneratorA, name: &str) {
     unsafe {
-        println!(
-            "{name}: {:p} {:?} {:?}",
-            g,
-            g,
-            g.as_ref().as_deref().unwrap()
-        );
+        println!("{name}: {:p} {:?} {:?}", g, g, g.as_ref().unwrap());
     }
 }

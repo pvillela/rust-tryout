@@ -13,15 +13,15 @@ fn main() {
 }
 
 fn fref(f: &'static (dyn Fn() -> String + Send + Sync)) {
-    let handle = thread::spawn(|| f());
+    let handle = thread::spawn(f);
     handle.join();
 
-    let handle = thread::spawn(|| f());
+    let handle = thread::spawn(f);
     handle.join();
 }
 
 fn fbox(f: Box<dyn Fn() -> String + Send + Sync>) {
-    let handle = thread::spawn(move || f());
+    let handle = thread::spawn(f);
     handle.join();
 
     // Below doesn't compile because f is consumed by above.
@@ -66,7 +66,7 @@ impl<T: 'static> FooRef<T> {
 
     fn new(f: fn() -> T) -> Self {
         Foo {
-            src: Box::leak(Box::new(move || f())),
+            src: Box::leak(Box::new(f)),
             _t: PhantomData,
         }
     }
@@ -78,7 +78,7 @@ impl<T: 'static> FooBox<T> {
 
     fn new(f: fn() -> T) -> Self {
         Foo {
-            src: Box::new(move || f()),
+            src: Box::new(f),
             _t: PhantomData,
         }
     }
@@ -90,7 +90,7 @@ impl<T: 'static> FooArc<T> {
 
     fn new(f: fn() -> T) -> Self {
         Foo {
-            src: Arc::new(move || f()),
+            src: Arc::new(f),
             _t: PhantomData,
         }
     }

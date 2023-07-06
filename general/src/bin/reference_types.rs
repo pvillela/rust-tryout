@@ -69,11 +69,11 @@ fn main() {
 
     f_as_ref_arc(a1.clone());
     f_deref_arc(a1.clone());
-    f_borrow_arc(a1.clone());
+    f_borrow_arc(a1);
 
     f_as_ref_rc(r1.clone());
     f_deref_rc(r1.clone());
-    f_borrow_rc(r1.clone());
+    f_borrow_rc(r1);
 
     f_deref(&x1);
     f_borrow_mut::<String, String>(x1, x2);

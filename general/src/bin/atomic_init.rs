@@ -17,7 +17,7 @@ impl<T> AtomicInit<T> {
         if self.initialized.load(Ordering::Acquire) {
             // Safety: value is guaranteed to be stable as initialization was controlled by atomic to
             // have happened before once and only once.
-            unsafe { (&*self.value.get()).as_ref() }
+            unsafe { (*self.value.get()).as_ref() }
         } else {
             None
         }
@@ -34,7 +34,7 @@ impl<T> AtomicInit<T> {
         }
         // Safety: value is guaranteed to be stable as initialization was controlled by atomic to
         // have happened before once and only once.
-        unsafe { (&*self.value.get()).as_ref() }
+        unsafe { (*self.value.get()).as_ref() }
     }
 
     /// Gets the value if initialized, panics otherwise.
@@ -54,7 +54,7 @@ impl<T> AtomicInit<T> {
         }
         // Safety: value is guaranteed to be stable as initialization was controlled by atomic to
         // have happened before once and only once.
-        unsafe { (&*self.value.get()).as_ref().unwrap() }
+        unsafe { (*self.value.get()).as_ref().unwrap() }
     }
 
     /// Creates an empty instance of Self.

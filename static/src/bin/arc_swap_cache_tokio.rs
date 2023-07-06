@@ -7,7 +7,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio;
 use tokio::time::sleep;
 
 #[allow(unused)]
@@ -39,12 +38,11 @@ async fn main() {
             // sleep(Duration::from_millis(0)).await;
 
             let x = c.borrow_mut().load().foo.clone();
-            Rc::new(x.clone())
+            Rc::new(x)
         });
         println!("Rc(x)={}", x);
 
-        let y = CACHE.with(|c| c.borrow_mut().load().foo.clone());
-        y
+        CACHE.with(|c| c.borrow_mut().load().foo.clone());
     });
 
     // Below doesn't compile.

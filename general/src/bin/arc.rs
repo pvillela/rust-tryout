@@ -80,7 +80,6 @@ fn arc_target_address<T>(rarc: &Arc<T>) -> usize {
 }
 
 fn arc_ptr_dump<T>(a: Arc<T>, name: &str) {
-    let a = a.clone();
     let ra: &Arc<T> = &a;
     let rt: &T = &a;
     let da: &T = a.deref();
@@ -95,7 +94,7 @@ fn arc_ptr_dump1<T>(ra: &Arc<T>, name: &str) {
     // let ra: &Arc<T> = a1;
     let a = ra.clone();
     let rt: &T = &ra;
-    let da: &T = ra.deref();
+    let da: &T = ra;
     let ap: usize = arc_target_address(ra);
     println!(
         "arc_ptr_dump1 for {name} -- a: {:p}, &a: {:p}, ra: {:p}, rt: {:p}, da: {:p}, ap: {:x}",

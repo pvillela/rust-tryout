@@ -24,9 +24,12 @@ fn main() {
         x: "foo".to_owned(),
     };
 
-    if let Err(_) = INFO_SRC.set(Arc::new(InfoSrc {
-        src: Box::new(move || info.clone()),
-    })) {
+    if INFO_SRC
+        .set(Arc::new(InfoSrc {
+            src: Box::new(move || info.clone()),
+        }))
+        .is_err()
+    {
         panic!("INFO_SRC already set")
     }
 

@@ -3,39 +3,24 @@
 
 use std::{future::Future, time::Duration};
 
-/// This works for both regular and async functions, returns FnOnce.
-fn partial_application<S1, S2, T>(f: fn(S1, S2) -> T, s1: S1) -> impl FnOnce(S2) -> T {
-    move |s2| f(s1, s2)
-}
-
-/// This works for both regular and async functions, returns Fn.
-fn partial_application_r1<'a, S1, S2: 'static, T: 'static>(
-    f: fn(&'a S1, S2) -> T,
-    s1: &'a S1,
-) -> impl Fn(S2) -> T + 'a {
-    move |s2| f(s1, s2)
-}
-
-fn partial_application_r2<'a, S1: 'static + Clone, S2: 'static, T: 'static>(
-    f: impl Fn(S1, &'a S2) -> T + 'a,
-    s1: S1,
-) -> impl Fn(&'a S2) -> T + 'a {
+/// This works for both regular and async functions.
+fn partial_application<S1, S2, T>(f: fn(S1, S2) -> T, s1: S1) -> impl Fn(S2) -> T
+where
+    S1: Clone,
+{
     move |s2| f(s1.clone(), s2)
 }
 
 /// This works only for async functinos, returns FnOnce.
-fn partial_application_async<S1, S2, T, FUT>(f: fn(S1, S2) -> FUT, s1: S1) -> impl FnOnce(S2) -> FUT
+fn partial_application_async<S1, S2, T, FUT>(f: fn(S1, S2) -> FUT, s1: S1) -> impl Fn(S2) -> FUT
 where
+    S1: Clone,
     FUT: Future<Output = T>,
 {
-    move |s2| f(s1, s2)
+    move |s2| f(s1.clone(), s2)
 }
 
 fn f(x: u64, y: u64) -> u64 {
-    x + y
-}
-
-fn f_r(x: &u64, y: u64) -> u64 {
     x + y
 }
 
@@ -57,30 +42,34 @@ async fn f_a_r2(x: u64, y: &u64) -> u64 {
 #[tokio::main]
 async fn main() {
     let f_part = partial_application(f, 20);
-    let res = f_part(2);
-    println!("{res}");
-
-    let f_part = partial_application_r1(f_r, &20);
+    _ = f_part(2);
     let res = f_part(2);
     println!("{res}");
 
     let f_part = partial_application(f_a, 40);
+    _ = f_part(2).await;
     let res = f_part(2).await;
     println!("{res}");
 
-    let f_part = partial_application_r1(f_a_r1, &40);
+    let f_part = partial_application(f_a_r1, &60);
+    _ = f_part(2).await;
     let res = f_part(2).await;
     println!("{res}");
-    let res = f_part(3).await;
-    println!("{res}");
 
-    let f_part = partial_application_r2(f_a_r2, 40);
+    let f_part = partial_application(f_a_r2, 60);
+    _ = f_part(&2).await;
     let res = f_part(&2).await;
-    println!("{res}");
-    let res = f_part(&3).await;
     println!("{res}");
 
     let f_part = partial_application_async(f_a, 60);
     let res = f_part(2).await;
+    println!("{res}");
+
+    let f_part = partial_application_async(f_a_r1, &60);
+    let res = f_part(2).await;
+    println!("{res}");
+
+    let f_part = partial_application_async(f_a_r2, 60);
+    let res = f_part(&2).await;
     println!("{res}");
 }

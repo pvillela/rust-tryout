@@ -1,6 +1,14 @@
 //! Updated from https://github.com/tokio-rs/tracing/blob/master/examples/examples/counters.rs,
 //! which contains references to an older version of the `tracing` crate.
 
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, RwLock, RwLockReadGuard,
+    },
+};
 use tracing::{
     field::{Field, Visit},
     info, span,
@@ -9,31 +17,26 @@ use tracing::{
 };
 use tracing_core::span::Current;
 
-use std::{
-    collections::HashMap,
-    fmt,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, OnceLock, RwLock, RwLockReadGuard,
-    },
-};
+/// Keeps track of counts by field name.
+type Counts = Arc<RwLock<HashMap<String, AtomicUsize>>>;
 
-#[derive(Clone, Debug)]
-struct Counter(Arc<RwLock<HashMap<String, AtomicUsize>>>);
-
-#[derive(Debug)]
-struct CounterCollector {
+/// Collects counts emitted by application spans and events.
+pub struct CountsCollector {
     next_id: AtomicUsize,
-    counter: Counter,
+    counts: Counts,
 }
 
-struct Count<'a> {
-    counter: RwLockReadGuard<'a, HashMap<String, AtomicUsize>>,
+/// Provides external visibility to counts collected by [CountsCollector].
+pub struct CountsHandle(Counts);
+
+/// Required for implementation of [CountsCollector] as a [Subscriber] to perform accumulation of counts.
+struct CountsVisitor<'a> {
+    counts: RwLockReadGuard<'a, HashMap<String, AtomicUsize>>,
 }
 
-impl<'a> Visit for Count<'a> {
+impl<'a> Visit for CountsVisitor<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
-        if let Some(counter) = self.counter.get(field.name()) {
+        if let Some(counter) = self.counts.get(field.name()) {
             if value > 0 {
                 counter.fetch_add(value as usize, Ordering::Release);
             } else {
@@ -43,7 +46,7 @@ impl<'a> Visit for Count<'a> {
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if let Some(counter) = self.counter.get(field.name()) {
+        if let Some(counter) = self.counts.get(field.name()) {
             counter.fetch_add(value as usize, Ordering::Release);
         };
     }
@@ -53,22 +56,39 @@ impl<'a> Visit for Count<'a> {
     fn record_debug(&mut self, _: &Field, _: &dyn fmt::Debug) {}
 }
 
-impl CounterCollector {
-    fn visitor(&self) -> Count<'_> {
-        Count {
-            counter: self.counter.0.read().unwrap(),
+impl CountsCollector {
+    fn new() -> (Self, CountsHandle) {
+        let counts = Arc::new(RwLock::new(HashMap::new()));
+        let handle = CountsHandle(counts.clone());
+        let collector = CountsCollector {
+            next_id: AtomicUsize::new(1),
+            counts,
+        };
+        (collector, handle)
+    }
+
+    fn visitor(&self) -> CountsVisitor<'_> {
+        CountsVisitor {
+            counts: self.counts.read().unwrap(),
         }
     }
 }
 
-impl Subscriber for &'static CounterCollector {
+impl CountsHandle {
+    fn print_counts(&self) {
+        for (k, v) in self.0.read().unwrap().iter() {
+            println!("{}: {}", k, v.load(Ordering::Acquire));
+        }
+    }
+}
+
+impl Subscriber for CountsCollector {
     fn register_callsite(&self, meta: &Metadata<'_>) -> Interest {
         let mut interest = Interest::never();
         for key in meta.fields() {
             let name = key.name();
             if name.contains("count") {
-                self.counter
-                    .0
+                self.counts
                     .write()
                     .unwrap()
                     .entry(name.to_owned())
@@ -80,10 +100,9 @@ impl Subscriber for &'static CounterCollector {
     }
 
     fn new_span(&self, new_span: &span::Attributes<'_>) -> Id {
-        println!("***** new_span executed *****");
         new_span.record(&mut self.visitor());
-        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        println!("id: {}", id);
+        let id = self.next_id.fetch_add(1, Ordering::AcqRel);
+        println!("`new_span` executed with id={}", id);
         Id::from_u64(id as u64)
     }
 
@@ -104,7 +123,7 @@ impl Subscriber for &'static CounterCollector {
     }
 
     fn enter(&self, _span: &Id) {
-        println!("***** enter executed *****");
+        println!("`enter` executed");
     }
     fn exit(&self, _span: &Id) {}
     fn current_span(&self) -> Current {
@@ -112,40 +131,19 @@ impl Subscriber for &'static CounterCollector {
     }
 }
 
-impl Counter {
-    fn print_counters(&self) {
-        for (k, v) in self.0.read().unwrap().iter() {
-            println!("{}: {}", k, v.load(Ordering::Acquire));
-        }
-    }
-
-    fn new() -> (Self, CounterCollector) {
-        let counters = Counter(Arc::new(RwLock::new(HashMap::new())));
-        let collector = CounterCollector {
-            next_id: AtomicUsize::new(1),
-            counter: counters.clone(),
-        };
-        (counters, collector)
-    }
-}
-
 fn main() {
-    let (counters, collector) = Counter::new();
-
-    static COLLECTOR: OnceLock<CounterCollector> = OnceLock::new();
-    let collector = COLLECTOR.get_or_init(|| collector);
+    let (collector, handle) = CountsCollector::new();
 
     tracing::subscriber::set_global_default(collector).unwrap();
 
     let mut foo: u64 = 1;
 
     for _ in 0..2 {
-        println!("***** Before top-level span! macro *****");
+        println!("Before top-level span! macro");
         span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
-            println!("***** After top-level span! macro");
             foo += 1;
             info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-            println!("***** Before lower-level span! macro *****");
+            println!("Before lower-level span! macro");
             span!(
                 Level::TRACE,
                 "my other span",
@@ -153,13 +151,10 @@ fn main() {
                 baz_count = 5
             )
             .in_scope(|| {
-                println!("***** After lower-level span! macro");
                 warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
             });
         });
     }
 
-    counters.print_counters();
-    println!("{:?}", collector);
-    println!("next_id={}", collector.next_id.load(Ordering::Acquire));
+    handle.print_counts();
 }

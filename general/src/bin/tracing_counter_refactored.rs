@@ -1,5 +1,6 @@
 //! Updated from https://github.com/tokio-rs/tracing/blob/master/examples/examples/counters.rs,
 //! which contains references to an older version of the `tracing` crate.
+//! This code renames some structs and refactors some of the code for hopefully improved clarity.
 
 use std::{
     collections::HashMap,

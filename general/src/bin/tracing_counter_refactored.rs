@@ -19,16 +19,16 @@ use tracing::{
 use tracing_core::span::Current;
 
 /// Keeps track of counts by field name.
-type Counts = Arc<RwLock<HashMap<String, AtomicUsize>>>;
+type Counts = RwLock<HashMap<String, AtomicUsize>>;
 
 /// Collects counts emitted by application spans and events.
 pub struct CountsCollector {
     next_id: AtomicUsize,
-    counts: Counts,
+    counts: Arc<Counts>,
 }
 
 /// Provides external visibility to counts collected by [CountsCollector].
-pub struct CountsHandle(Counts);
+pub struct CountsHandle(Arc<Counts>);
 
 /// Required for implementation of [CountsCollector] as a [Subscriber] to perform accumulation of counts.
 struct CountsVisitor<'a> {

@@ -1,12 +1,10 @@
-//! Updated from https://github.com/tokio-rs/tracing/blob/master/examples/examples/counters.rs,
-//! which contains references to an older version of the `tracing` crate.
-//! This code renames some structs and refactors some of the code for hopefully improved clarity.
+//! Modification of module `tracing_counter_refactored` to capture separate counts by span.
 
 use std::{
     collections::HashMap,
     fmt,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicI64, AtomicUsize, Ordering},
         Arc, RwLock, RwLockReadGuard,
     },
 };
@@ -16,39 +14,61 @@ use tracing::{
     subscriber::{Interest, Subscriber},
     warn, Event, Id, Level, Metadata,
 };
-use tracing_core::span::Current;
+use tracing_core::callsite::Identifier;
 
 /// Keeps track of counts by field name.
-type Counts = RwLock<HashMap<String, AtomicUsize>>;
+type FieldCounts = RwLock<HashMap<String, AtomicI64>>;
+
+/// Keeps track of counts by callsite.
+type CountsBySpan = RwLock<HashMap<Identifier, SpanCounts>>;
+
+#[derive(Debug)]
+struct SpanCounts {
+    meta_name: String,
+    field_counts: FieldCounts,
+}
 
 /// Collects counts emitted by application spans and events.
 pub struct CountsCollector {
     next_id: AtomicUsize,
-    counts: Arc<Counts>,
+    counts_by_span: Arc<CountsBySpan>,
 }
 
 /// Provides external visibility to counts collected by [CountsCollector].
-pub struct CountsHandle(Arc<Counts>);
+pub struct CountsHandle(Arc<CountsBySpan>);
 
 /// Required for implementation of [CountsCollector] as a [Subscriber] to perform accumulation of counts.
-struct CountsVisitor<'a> {
-    counts: RwLockReadGuard<'a, HashMap<String, AtomicUsize>>,
+struct FieldCountsVisitor<'a> {
+    callsite: Identifier,
+    counts_by_span: RwLockReadGuard<'a, HashMap<Identifier, SpanCounts>>, //RwLockReadGuard<'a, HashMap<Identifier, FieldCounts>>,
 }
 
-impl<'a> Visit for CountsVisitor<'a> {
+impl<'a> Visit for FieldCountsVisitor<'a> {
     fn record_i64(&mut self, field: &Field, value: i64) {
-        if let Some(counter) = self.counts.get(field.name()) {
-            if value > 0 {
-                counter.fetch_add(value as usize, Ordering::Release);
-            } else {
-                counter.fetch_sub(-value as usize, Ordering::Release);
-            }
+        if let Some(counter) = self
+            .counts_by_span
+            .get(&self.callsite)
+            .unwrap()
+            .field_counts
+            .read()
+            .unwrap()
+            .get(field.name())
+        {
+            counter.fetch_add(value, Ordering::Release);
         };
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if let Some(counter) = self.counts.get(field.name()) {
-            counter.fetch_add(value as usize, Ordering::Release);
+        if let Some(counter) = self
+            .counts_by_span
+            .get(&self.callsite)
+            .unwrap()
+            .field_counts
+            .read()
+            .unwrap()
+            .get(field.name())
+        {
+            counter.fetch_add(value as i64, Ordering::Release);
         };
     }
 
@@ -63,22 +83,28 @@ impl CountsCollector {
         let handle = CountsHandle(counts.clone());
         let collector = CountsCollector {
             next_id: AtomicUsize::new(1),
-            counts,
+            counts_by_span: counts,
         };
         (collector, handle)
     }
 
-    fn visitor(&self) -> CountsVisitor<'_> {
-        CountsVisitor {
-            counts: self.counts.read().unwrap(),
+    fn visitor(&self, callsite: Identifier) -> FieldCountsVisitor {
+        let x = self.counts_by_span.read().unwrap();
+        FieldCountsVisitor {
+            callsite,
+            counts_by_span: x,
         }
     }
 }
 
 impl CountsHandle {
     fn print_counts(&self) {
-        for (k, v) in self.0.read().unwrap().iter() {
-            println!("{}: {}", k, v.load(Ordering::Acquire));
+        for (_, v) in self.0.read().unwrap().iter() {
+            println!("meta_name={}", v.meta_name);
+            for (k1, v1) in v.field_counts.read().unwrap().iter() {
+                println!("  field={}, value={}", k1, v1.load(Ordering::Acquire));
+            }
+            // println!("{:?}: {:?}", k, v);
         }
     }
 }
@@ -86,23 +112,42 @@ impl CountsHandle {
 impl Subscriber for CountsCollector {
     fn register_callsite(&self, meta: &Metadata<'_>) -> Interest {
         println!("`register_callsite` entered");
+
+        let meta_name = meta.name();
+        let callsite = meta.callsite();
+
         let mut interest = Interest::never();
         for key in meta.fields() {
+            let callsite = callsite.clone();
             let name = key.name();
             if name.contains("count") {
-                self.counts
+                let mut x1 = self.counts_by_span.write().unwrap();
+                let x2 = x1.entry(callsite.clone()).or_insert_with(|| SpanCounts {
+                    // callsite,
+                    meta_name: meta_name.to_owned(),
+                    field_counts: RwLock::new(HashMap::new()),
+                });
+                x2.field_counts
                     .write()
                     .unwrap()
                     .entry(name.to_owned())
-                    .or_insert_with(|| AtomicUsize::new(0));
+                    .or_insert_with(|| AtomicI64::new(0));
                 interest = Interest::always();
             }
         }
+
+        println!(
+            "`register_callsite` executed with id={:?}, meta_name={}",
+            callsite, meta_name
+        );
+
         interest
     }
 
     fn new_span(&self, new_span: &span::Attributes<'_>) -> Id {
-        new_span.record(&mut self.visitor());
+        println!("`new_span` entered");
+        let callsite = new_span.metadata().callsite();
+        new_span.record(&mut self.visitor(callsite));
         let id = self.next_id.fetch_add(1, Ordering::AcqRel);
         println!("`new_span` executed with id={}", id);
         Id::from_u64(id as u64)
@@ -114,24 +159,23 @@ impl Subscriber for CountsCollector {
 
     fn record(&self, _: &Id, _values: &span::Record<'_>) {
         println!("`record` entered");
-        // values.record(&mut self.visitor())
     }
 
     fn event(&self, event: &Event<'_>) {
-        event.record(&mut self.visitor())
+        let callsite = event.metadata().callsite();
+        event.record(&mut self.visitor(callsite))
     }
 
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        metadata.fields().iter().any(|f| f.name().contains("count"))
+    fn enabled(&self, _metadata: &Metadata<'_>) -> bool {
+        // metadata.fields().iter().any(|f| f.name().contains("count"))
+        true
     }
 
     fn enter(&self, _span: &Id) {
-        println!("`enter` executed");
+        println!("`enter` entered");
     }
+
     fn exit(&self, _span: &Id) {}
-    fn current_span(&self) -> Current {
-        Current::none()
-    }
 }
 
 fn main() {

@@ -14,9 +14,9 @@ use std::{
 use tracing::{
     info, span,
     subscriber::{Interest, Subscriber},
-    warn, Event, Id, Level, Metadata,
+    warn, Event, Id, Metadata,
 };
-use tracing_core::callsite::Identifier;
+use tracing_core::{callsite::Identifier, Level};
 
 /// Keeps track of counts by callsite.
 type TimingBySpan = RwLock<HashMap<Identifier, SpanCallsiteTiming>>;
@@ -44,7 +44,7 @@ pub struct TimingCollector {
 pub struct TimingHandle(Arc<TimingBySpan>);
 
 impl TimingCollector {
-    fn new() -> (Self, TimingHandle) {
+    pub fn new() -> (Self, TimingHandle) {
         let timing_by_span = Arc::new(RwLock::new(HashMap::new()));
         let span_entry_times = RwLock::new(HashMap::new());
         let handle = TimingHandle(timing_by_span.clone());
@@ -58,7 +58,7 @@ impl TimingCollector {
 }
 
 impl TimingHandle {
-    fn print_timing(&self) {
+    pub fn print_timing(&self) {
         for (_, v) in self.0.read().unwrap().iter() {
             let acc_time = v.acc_time.load(Ordering::Acquire);
             let count = v.count.load(Ordering::Acquire);
@@ -98,7 +98,7 @@ impl Subscriber for TimingCollector {
     fn new_span(&self, new_span: &span::Attributes<'_>) -> Id {
         println!("`new_span` entered");
         let callsite = new_span.metadata().callsite();
-        let id = self.next_id.fetch_add(1, Ordering::AcqRel);
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
         let mut map = self.span_entry_times.write().unwrap();
         map.insert(
@@ -130,16 +130,30 @@ impl Subscriber for TimingCollector {
         true
     }
 
-    fn enter(&self, _span: &Id) {
-        println!("`enter` entered");
+    fn enter(&self, span: &Id) {
+        println!("entered `enter` wth span Id {:?}", span);
     }
 
     fn exit(&self, span: &Id) {
+        println!("entered `exit` wth span Id {:?}", span);
+    }
+
+    fn try_close(&self, id: Id) -> bool {
+        println!("entered `try_close` wth span Id {:?}", id);
         let mut map1 = self.span_entry_times.write().unwrap();
+        let span_entry_time = map1.remove(&id);
+        if span_entry_time.is_none() {
+            println!(
+                "***** `try_close` called with span Id {:?} which is not found in self.span_entry_times, processing skipped",
+                id
+            );
+            return true;
+        }
+
         let SpanEntryTime {
             callsite,
             started_at,
-        } = map1.remove(span).unwrap();
+        } = span_entry_time.unwrap();
         let map2 = self.timing_by_span.read().unwrap();
         let timing = map2.get(&callsite).unwrap();
         timing.acc_time.fetch_add(
@@ -147,7 +161,8 @@ impl Subscriber for TimingCollector {
             Ordering::AcqRel,
         );
         timing.count.fetch_add(1, Ordering::AcqRel);
-        println!("`exit` executed for span id {:?}", span);
+        println!("`try_close` executed for span id {:?}", id);
+        true
     }
 }
 

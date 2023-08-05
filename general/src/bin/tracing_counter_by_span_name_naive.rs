@@ -1,4 +1,6 @@
 //! Modification of module `tracing_counter_refactored` to capture separate counts by span.
+//! Naive because it does not use [tracing_subscriber::Registry] and instead uses a naive storage
+//! approach based on [std::sync::RwLock].
 
 use std::{
     collections::HashMap,

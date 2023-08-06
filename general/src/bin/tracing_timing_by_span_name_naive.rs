@@ -1,6 +1,10 @@
 //! Based on `tracing_counter_by_span_name_naive` and `tracing_timing_original`.
 //! Naive because it does not use [tracing_subscriber::Registry] and instead uses a naive storage
 //! approach based on [std::sync::RwLock].
+//!
+//! This captures both total and sync timings:
+//! - total timings include suspend time and are based on span creation and closing;
+//! - sync timings exclude suspend time and are based on span entry and exit.
 
 use std::{
     collections::HashMap,
@@ -24,20 +28,22 @@ type TimingBySpan = RwLock<HashMap<Identifier, SpanCallsiteTiming>>;
 #[derive(Debug)]
 struct SpanCallsiteTiming {
     meta_name: String,
-    acc_time: AtomicU64,
+    acc_total_time: AtomicU64,
+    acc_active_time: AtomicU64,
     count: AtomicU64,
 }
 
-struct SpanEntryTime {
+struct SpanStartTime {
     callsite: Identifier,
-    started_at: Instant,
+    created_at: RwLock<Instant>,
+    entered_at: RwLock<Instant>,
 }
 
 /// Collects counts emitted by application spans and events.
 pub struct TimingCollector {
     next_id: AtomicUsize,
     timing_by_span: Arc<TimingBySpan>,
-    span_entry_times: RwLock<HashMap<Id, SpanEntryTime>>,
+    span_start_times: RwLock<HashMap<Id, SpanStartTime>>,
 }
 
 /// Provides external visibility to counts collected by [CountsCollector].
@@ -46,12 +52,12 @@ pub struct TimingHandle(Arc<TimingBySpan>);
 impl TimingCollector {
     pub fn new() -> (Self, TimingHandle) {
         let timing_by_span = Arc::new(RwLock::new(HashMap::new()));
-        let span_entry_times = RwLock::new(HashMap::new());
+        let span_start_times = RwLock::new(HashMap::new());
         let handle = TimingHandle(timing_by_span.clone());
         let collector = TimingCollector {
             next_id: AtomicUsize::new(1),
             timing_by_span,
-            span_entry_times,
+            span_start_times,
         };
         (collector, handle)
     }
@@ -60,12 +66,18 @@ impl TimingCollector {
 impl TimingHandle {
     pub fn print_timing(&self) {
         for (_, v) in self.0.read().unwrap().iter() {
-            let acc_time = v.acc_time.load(Ordering::Acquire);
+            let acc_total_time = v.acc_total_time.load(Ordering::Acquire);
+            let acc_active_time = v.acc_active_time.load(Ordering::Acquire);
             let count = v.count.load(Ordering::Acquire);
-            let mean = if count > 0 { acc_time / count } else { 0 };
+            let mean_total_time = if count > 0 { acc_total_time / count } else { 0 };
+            let mean_active_time = if count > 0 {
+                acc_active_time / count
+            } else {
+                0
+            };
             println!(
-                "  name={}, acc_time={}μs, count={}, mean={}μs",
-                v.meta_name, acc_time, count, mean
+                "  name={}, acc_time={}μs, acc_sync_time={}μs, count={}, mean_time={}μs, mean_sync_time={}μs",
+                v.meta_name, acc_total_time, acc_active_time, count, mean_total_time, mean_active_time
             );
         }
     }
@@ -73,42 +85,52 @@ impl TimingHandle {
 
 impl Subscriber for TimingCollector {
     fn register_callsite(&self, meta: &Metadata<'_>) -> Interest {
-        println!("`register_callsite` entered");
+        //println!("`register_callsite` entered");
 
         let meta_name = meta.name();
         let callsite = meta.callsite();
         let interest = Interest::always();
 
         let mut map = self.timing_by_span.write().unwrap();
-        map.entry(callsite.clone())
-            .or_insert_with(|| SpanCallsiteTiming {
+        map.insert(
+            callsite.clone(),
+            SpanCallsiteTiming {
                 meta_name: meta_name.to_owned(),
-                acc_time: AtomicU64::new(0),
+                acc_total_time: AtomicU64::new(0),
+                acc_active_time: AtomicU64::new(0),
                 count: AtomicU64::new(0),
-            });
-
-        println!(
-            "`register_callsite` executed with id={:?}, meta_name={}",
-            callsite, meta_name
+            },
         );
+
+        //println!(
+        //     "`register_callsite` executed with id={:?}, meta_name={}",
+        //     callsite, meta_name
+        // );
 
         interest
     }
 
     fn new_span(&self, new_span: &span::Attributes<'_>) -> Id {
-        println!("`new_span` entered");
+        //println!("`new_span` entered");
         let callsite = new_span.metadata().callsite();
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let id = Id::from_u64(id as u64);
-        let mut map = self.span_entry_times.write().unwrap();
-        map.insert(
+
+        let mut start_times = self.span_start_times.write().unwrap();
+        start_times.insert(
             id.clone(),
-            SpanEntryTime {
-                callsite,
-                started_at: Instant::now(),
+            SpanStartTime {
+                callsite: callsite.clone(),
+                created_at: RwLock::new(Instant::now()),
+                entered_at: RwLock::new(Instant::now()),
             },
         );
-        println!("`new_span` executed with id={:?}", id);
+
+        let timings = self.timing_by_span.read().unwrap();
+        let timing = timings.get(&callsite).unwrap();
+        timing.count.fetch_add(1, Ordering::AcqRel);
+
+        //println!("`new_span` executed with id={:?}", id);
         id
     }
 
@@ -117,12 +139,12 @@ impl Subscriber for TimingCollector {
     }
 
     fn record(&self, _: &Id, _values: &span::Record<'_>) {
-        println!("`record` entered");
+        //println!("`record` entered");
     }
 
     fn event(&self, event: &Event<'_>) {
-        let name = event.metadata().name();
-        println!("`event` executed for name: {}", name)
+        let _name = event.metadata().name();
+        //println!("`event` executed for name: {}", name)
     }
 
     fn enabled(&self, _metadata: &Metadata<'_>) -> bool {
@@ -130,39 +152,87 @@ impl Subscriber for TimingCollector {
         true
     }
 
-    fn enter(&self, span: &Id) {
-        println!("entered `enter` wth span Id {:?}", span);
+    fn enter(&self, id: &Id) {
+        //println!("entered `enter` wth span Id {:?}", id);
+        let start_times = self.span_start_times.write().unwrap();
+        let mut start_time = start_times.get(id).unwrap().entered_at.write().unwrap();
+        *start_time = Instant::now();
+        //println!("`enter` executed with id={:?}", id);
     }
 
-    fn exit(&self, span: &Id) {
-        println!("entered `exit` wth span Id {:?}", span);
+    fn exit(&self, id: &Id) {
+        //println!("entered `exit` wth span Id {:?}", id);
+        let start_times = self.span_start_times.write().unwrap();
+        let SpanStartTime {
+            callsite,
+            created_at: _,
+            entered_at,
+        } = start_times.get(id).unwrap();
+
+        let timings = self.timing_by_span.read().unwrap();
+        let timing = timings.get(&callsite).unwrap();
+        timing.acc_active_time.fetch_add(
+            (Instant::now() - *entered_at.read().unwrap()).as_micros() as u64,
+            Ordering::AcqRel,
+        );
+        //println!("`try_close` executed for span id {:?}", id);
     }
 
     fn try_close(&self, id: Id) -> bool {
-        println!("entered `try_close` wth span Id {:?}", id);
-        let mut map1 = self.span_entry_times.write().unwrap();
-        let span_entry_time = map1.remove(&id);
-        if span_entry_time.is_none() {
-            println!(
-                "***** `try_close` called with span Id {:?} which is not found in self.span_entry_times, processing skipped",
-                id
-            );
-            return true;
-        }
-
-        let SpanEntryTime {
+        //println!("entered `try_close` wth span Id {:?}", id);
+        let mut start_times = self.span_start_times.write().unwrap();
+        let SpanStartTime {
             callsite,
-            started_at,
-        } = span_entry_time.unwrap();
-        let map2 = self.timing_by_span.read().unwrap();
-        let timing = map2.get(&callsite).unwrap();
-        timing.acc_time.fetch_add(
-            (Instant::now() - started_at).as_micros() as u64,
+            created_at,
+            entered_at: _,
+        } = start_times.remove(&id).unwrap();
+
+        let timings = self.timing_by_span.read().unwrap();
+        let timing = timings.get(&callsite).unwrap();
+        timing.acc_total_time.fetch_add(
+            (Instant::now() - *created_at.read().unwrap()).as_micros() as u64,
             Ordering::AcqRel,
         );
-        timing.count.fetch_add(1, Ordering::AcqRel);
-        println!("`try_close` executed for span id {:?}", id);
+        //println!("`try_close` executed for span id {:?}", id);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{thread, time::Duration};
+    use tracing::{info, span, warn, Level};
+
+    #[test]
+    fn test_all() {
+        let (collector, handle) = TimingCollector::new();
+
+        tracing::subscriber::set_global_default(collector).unwrap();
+
+        let mut foo: u64 = 1;
+
+        for _ in 0..2 {
+            //println!("Before top-level span! macro");
+            span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
+                thread::sleep(Duration::from_millis(100));
+                foo += 1;
+                info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
+                //println!("Before lower-level span! macro");
+                span!(
+                    Level::TRACE,
+                    "my other span",
+                    foo_count = &foo,
+                    baz_count = 5
+                )
+                .in_scope(|| {
+                    thread::sleep(Duration::from_millis(25));
+                    warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
+                });
+            });
+        }
+
+        handle.print_timing();
     }
 }
 

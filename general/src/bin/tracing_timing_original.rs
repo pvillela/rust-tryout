@@ -3,9 +3,11 @@
 use std::time::{Duration, Instant};
 use tracing::span::{Attributes, Id};
 use tracing::Subscriber;
-use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 struct Timing {
     started_at: Instant,

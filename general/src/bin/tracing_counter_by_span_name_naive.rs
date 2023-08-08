@@ -11,12 +11,12 @@ use std::{
     },
 };
 use tracing::{
+    callsite::Identifier,
     field::{Field, Visit},
     info, span,
     subscriber::{Interest, Subscriber},
     warn, Event, Id, Level, Metadata,
 };
-use tracing_core::callsite::Identifier;
 
 /// Keeps track of counts by field name.
 type FieldCounts = RwLock<HashMap<String, AtomicI64>>;

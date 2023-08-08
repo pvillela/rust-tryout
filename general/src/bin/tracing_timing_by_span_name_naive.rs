@@ -16,11 +16,12 @@ use std::{
     time::{Duration, Instant},
 };
 use tracing::{
+    callsite::Identifier,
+    dispatcher::set_global_default,
     info, span,
     subscriber::{Interest, Subscriber},
-    warn, Event, Id, Metadata,
+    warn, Dispatch, Event, Id, Level, Metadata,
 };
-use tracing_core::{callsite::Identifier, Level};
 
 /// Keeps track of counts by callsite.
 type TimingBySpan = RwLock<HashMap<Identifier, SpanCallsiteTiming>>;
@@ -46,26 +47,20 @@ pub struct TimingCollector {
     span_start_times: RwLock<HashMap<Id, SpanStartTime>>,
 }
 
-/// Provides external visibility to counts collected by [CountsCollector].
-pub struct TimingHandle(Arc<TimingBySpan>);
-
 impl TimingCollector {
-    pub fn new() -> (Self, TimingHandle) {
+    pub fn new_dispatch() -> Dispatch {
         let timing_by_span = Arc::new(RwLock::new(HashMap::new()));
         let span_start_times = RwLock::new(HashMap::new());
-        let handle = TimingHandle(timing_by_span.clone());
         let collector = TimingCollector {
             next_id: AtomicUsize::new(1),
             timing_by_span,
             span_start_times,
         };
-        (collector, handle)
+        Dispatch::new(collector)
     }
-}
 
-impl TimingHandle {
     pub fn print_timing(&self) {
-        for (_, v) in self.0.read().unwrap().iter() {
+        for (_, v) in self.timing_by_span.read().unwrap().iter() {
             let acc_total_time = v.acc_total_time.load(Ordering::Acquire);
             let acc_active_time = v.acc_active_time.load(Ordering::Acquire);
             let count = v.count.load(Ordering::Acquire);
@@ -198,48 +193,9 @@ impl Subscriber for TimingCollector {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{thread, time::Duration};
-    use tracing::{info, span, warn, Level};
-
-    #[test]
-    fn test_all() {
-        let (collector, handle) = TimingCollector::new();
-
-        tracing::subscriber::set_global_default(collector).unwrap();
-
-        let mut foo: u64 = 1;
-
-        for _ in 0..2 {
-            //println!("Before top-level span! macro");
-            span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
-                thread::sleep(Duration::from_millis(100));
-                foo += 1;
-                info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-                //println!("Before lower-level span! macro");
-                span!(
-                    Level::TRACE,
-                    "my other span",
-                    foo_count = &foo,
-                    baz_count = 5
-                )
-                .in_scope(|| {
-                    thread::sleep(Duration::from_millis(25));
-                    warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
-                });
-            });
-        }
-
-        handle.print_timing();
-    }
-}
-
 fn main() {
-    let (collector, handle) = TimingCollector::new();
-
-    tracing::subscriber::set_global_default(collector).unwrap();
+    let dispatch = TimingCollector::new_dispatch();
+    set_global_default(dispatch.clone()).unwrap();
 
     let mut foo: u64 = 1;
 
@@ -263,5 +219,6 @@ fn main() {
         });
     }
 
-    handle.print_timing();
+    let collector: &TimingCollector = dispatch.downcast_ref().unwrap();
+    collector.print_timing();
 }

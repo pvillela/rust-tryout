@@ -1,14 +1,13 @@
 //! Example usage of [hdrhistogram::sync::SyncHistogram].
 
+use hdrhistogram::{
+    sync::{Recorder, SyncHistogram},
+    Histogram,
+};
 use std::{
     cell::RefCell,
     sync::{OnceLock, RwLock},
     thread,
-};
-
-use hdrhistogram::{
-    sync::{Recorder, SyncHistogram},
-    Histogram,
 };
 
 fn get_histogram() -> &'static RwLock<SyncHistogram<u64>> {
@@ -57,9 +56,7 @@ fn main() {
 
         thread::scope(|s| {
             s.spawn(|| {
-                with_recorder(|r| {
-                    r.record_n(4, 2).unwrap();
-                });
+                with_recorder(|r| r.record_n(4, 2).unwrap());
             });
         });
 

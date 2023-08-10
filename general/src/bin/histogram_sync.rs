@@ -31,31 +31,64 @@ fn with_recorder(f: fn(&mut Recorder<u64>) -> ()) {
 }
 
 fn main() {
-    thread::scope(|s| {
-        s.spawn(|| {
-            with_recorder(|r| r.record(1).unwrap());
-        });
-    });
+    {
+        let mut hist = get_histogram().write().unwrap();
+        let mut recorder1 = hist.recorder();
+        {
+            let mut recorder2 = hist.recorder();
+            recorder1.record_n(3, 3).unwrap();
+            recorder2.record_n(7, 3).unwrap();
+        }
+        drop(recorder1);
 
-    thread::scope(|s| {
-        s.spawn(|| {
-            with_recorder(|r| {
-                r.record(4).unwrap();
-                r.record(4).unwrap();
+        // refresh() blockx until all existing recorders are dropped.
+        hist.refresh();
+
+        println!("mean={}", hist.mean());
+        println!("histogram={:?}", hist);
+    }
+
+    {
+        thread::scope(|s| {
+            s.spawn(|| {
+                with_recorder(|r| r.record(1).unwrap());
             });
         });
-    });
 
-    thread::scope(|s| {
-        s.spawn(|| {
-            with_recorder(|r| r.record(9).unwrap());
-            with_recorder(|r| r.record(9).unwrap());
-            with_recorder(|r| r.record(9).unwrap());
+        thread::scope(|s| {
+            s.spawn(|| {
+                with_recorder(|r| {
+                    r.record_n(4, 2).unwrap();
+                });
+            });
         });
-    });
 
-    get_histogram().write().unwrap().refresh();
+        thread::scope(|s| {
+            s.spawn(|| {
+                with_recorder(|r| r.record_n(9, 3).unwrap());
+            });
+        });
 
-    println!("mean={}", get_histogram().read().unwrap().mean());
-    println!("histogram={:?}", get_histogram());
+        // refresh() blockx until all existing recorders are dropped.
+        get_histogram().write().unwrap().refresh();
+
+        println!("mean={}", get_histogram().read().unwrap().mean());
+        println!("histogram={:?}", get_histogram());
+    }
+
+    {
+        let mut hist = get_histogram().write().unwrap();
+        {
+            let mut recorder1 = hist.recorder();
+            let mut recorder2 = hist.recorder();
+            recorder1.record_n(6, 3).unwrap();
+            recorder2.record_n(8, 3).unwrap();
+        }
+
+        // refresh() blockx until all existing recorders are dropped.
+        hist.refresh();
+
+        println!("mean={}", hist.mean());
+        println!("histogram={:?}", hist);
+    }
 }

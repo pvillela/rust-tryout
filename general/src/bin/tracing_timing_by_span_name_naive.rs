@@ -4,13 +4,13 @@
 //!
 //! This captures both total and sync timings:
 //! - total timings include suspend time and are based on span creation and closing;
-//! - sync timings exclude suspend time and are based on span entry and exit.
+//! - active timings exclude suspend time and are based on span entry and exit.
 
 use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc, RwLock,
+        RwLock,
     },
     thread,
     time::{Duration, Instant},
@@ -24,10 +24,10 @@ use tracing::{
 };
 
 /// Keeps track of counts by callsite.
-type TimingBySpan = RwLock<HashMap<Identifier, SpanCallsiteTiming>>;
+type TimingBySpan = RwLock<HashMap<Identifier, CallsiteTiming>>;
 
 #[derive(Debug)]
-struct SpanCallsiteTiming {
+struct CallsiteTiming {
     meta_name: String,
     acc_total_time: AtomicU64,
     acc_active_time: AtomicU64,
@@ -36,20 +36,20 @@ struct SpanCallsiteTiming {
 
 struct SpanStartTime {
     callsite: Identifier,
-    created_at: RwLock<Instant>,
-    entered_at: RwLock<Instant>,
+    created_at: Instant,
+    entered_at: Instant,
 }
 
 /// Collects counts emitted by application spans and events.
 pub struct TimingCollector {
     next_id: AtomicUsize,
-    timing_by_span: Arc<TimingBySpan>,
+    timing_by_span: TimingBySpan,
     span_start_times: RwLock<HashMap<Id, SpanStartTime>>,
 }
 
 impl TimingCollector {
     pub fn new_dispatch() -> Dispatch {
-        let timing_by_span = Arc::new(RwLock::new(HashMap::new()));
+        let timing_by_span = RwLock::new(HashMap::new());
         let span_start_times = RwLock::new(HashMap::new());
         let collector = TimingCollector {
             next_id: AtomicUsize::new(1),
@@ -71,7 +71,7 @@ impl TimingCollector {
                 0
             };
             println!(
-                "  name={}, acc_time={}μs, acc_sync_time={}μs, count={}, mean_time={}μs, mean_sync_time={}μs",
+                "  name={}, acc_total_time={}μs, acc_active_time={}μs, count={}, mean_total_time={}μs, mean_active_time={}μs",
                 v.meta_name, acc_total_time, acc_active_time, count, mean_total_time, mean_active_time
             );
         }
@@ -89,7 +89,7 @@ impl Subscriber for TimingCollector {
         let mut map = self.timing_by_span.write().unwrap();
         map.insert(
             callsite.clone(),
-            SpanCallsiteTiming {
+            CallsiteTiming {
                 meta_name: meta_name.to_owned(),
                 acc_total_time: AtomicU64::new(0),
                 acc_active_time: AtomicU64::new(0),
@@ -116,8 +116,8 @@ impl Subscriber for TimingCollector {
             id.clone(),
             SpanStartTime {
                 callsite: callsite.clone(),
-                created_at: RwLock::new(Instant::now()),
-                entered_at: RwLock::new(Instant::now()),
+                created_at: Instant::now(),
+                entered_at: Instant::now(),
             },
         );
 
@@ -149,8 +149,8 @@ impl Subscriber for TimingCollector {
 
     fn enter(&self, id: &Id) {
         //println!("entered `enter` wth span Id {:?}", id);
-        let start_times = self.span_start_times.write().unwrap();
-        let mut start_time = start_times.get(id).unwrap().entered_at.write().unwrap();
+        let mut start_times = self.span_start_times.write().unwrap();
+        let start_time = &mut start_times.get_mut(id).unwrap().entered_at;
         *start_time = Instant::now();
         //println!("`enter` executed with id={:?}", id);
     }
@@ -167,7 +167,7 @@ impl Subscriber for TimingCollector {
         let timings = self.timing_by_span.read().unwrap();
         let timing = timings.get(&callsite).unwrap();
         timing.acc_active_time.fetch_add(
-            (Instant::now() - *entered_at.read().unwrap()).as_micros() as u64,
+            (Instant::now() - *entered_at).as_micros() as u64,
             Ordering::AcqRel,
         );
         //println!("`try_close` executed for span id {:?}", id);
@@ -185,7 +185,7 @@ impl Subscriber for TimingCollector {
         let timings = self.timing_by_span.read().unwrap();
         let timing = timings.get(&callsite).unwrap();
         timing.acc_total_time.fetch_add(
-            (Instant::now() - *created_at.read().unwrap()).as_micros() as u64,
+            (Instant::now() - created_at).as_micros() as u64,
             Ordering::AcqRel,
         );
         //println!("`try_close` executed for span id {:?}", id);

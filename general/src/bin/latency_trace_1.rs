@@ -68,8 +68,9 @@ fn with_recorder(
         let mut callsite_recorders = m.borrow_mut();
         let mut recorder = callsite_recorders.entry(id.clone()).or_insert_with(|| {
             println!(
-                "***** thrad-loacal CallsiteRecorder created for callsite={:?}",
-                id
+                "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
+                id,
+                thread::current().id()
             );
 
             // Below is taken care of by [Timings::register_callsite]

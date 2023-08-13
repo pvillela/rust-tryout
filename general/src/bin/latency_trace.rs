@@ -81,10 +81,9 @@ impl Latencies {
     }
 
     pub fn print_mean_timings(&self) {
+        let timings = self.read();
         println!("\nMean timing values by span:");
-        for (_, v) in self.0.callsite_timings.write().unwrap().iter_mut() {
-            v.total_time.refresh();
-            v.active_time.refresh();
+        for (_, v) in timings.iter() {
             let mean_total_time = v.total_time.mean();
             let mean_active_time = v.active_time.mean();
             let total_time_count = v.total_time.len();
@@ -95,33 +94,33 @@ impl Latencies {
             );
         }
     }
-}
 
-fn with_recorder(timings: &Timings, id: &Identifier, f: impl Fn(&mut CallsiteRecorder) -> ()) {
-    thread_local! {
-        static RECORDERS: RefCell<HashMap<Identifier, CallsiteRecorder>> = RefCell::new(HashMap::new());
-    }
+    fn with_recorder(&self, id: &Identifier, f: impl Fn(&mut CallsiteRecorder) -> ()) {
+        thread_local! {
+            static RECORDERS: RefCell<HashMap<Identifier, CallsiteRecorder>> = RefCell::new(HashMap::new());
+        }
 
-    RECORDERS.with(|m| {
-        let mut callsite_recorders = m.borrow_mut();
-        let mut recorder = callsite_recorders.entry(id.clone()).or_insert_with(|| {
-            println!(
-                "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
-                id,
-                thread::current().id()
-            );
+        RECORDERS.with(|m| {
+            let mut callsite_recorders = m.borrow_mut();
+            let mut recorder = callsite_recorders.entry(id.clone()).or_insert_with(|| {
+                println!(
+                    "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
+                    id,
+                    thread::current().id()
+                );
 
-            let callsite_timings = timings.callsite_timings.read().unwrap();
-            let callsite_timing = callsite_timings.get(&id).unwrap();
+                let callsite_timings = self.0.callsite_timings.read().unwrap();
+                let callsite_timing = callsite_timings.get(&id).unwrap();
 
-            CallsiteRecorder {
-                total_time: callsite_timing.total_time.recorder(),
-                active_time: callsite_timing.active_time.recorder(),
-            }
+                CallsiteRecorder {
+                    total_time: callsite_timing.total_time.recorder(),
+                    active_time: callsite_timing.active_time.recorder(),
+                }
+            });
+
+            f(&mut recorder);
         });
-
-        f(&mut recorder);
-    });
+    }
 }
 
 impl<S> Layer<S> for Latencies
@@ -201,14 +200,11 @@ where
         let ext = span.extensions();
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
-        with_recorder(&self.0, &callsite, |r| {
+        self.with_recorder(&callsite, |r| {
             r.total_time
                 .record((Instant::now() - span_timing.created_at).as_micros() as u64)
-                .unwrap()
-        });
-
-        with_recorder(&self.0, &callsite, |r| {
-            r.active_time.record(span_timing.acc_active_time).unwrap()
+                .unwrap();
+            r.active_time.record(span_timing.acc_active_time).unwrap();
         });
 
         //println!("`try_close` executed for span id {:?}", id);
@@ -281,7 +277,6 @@ fn main() {
     latencies.print_mean_timings();
 
     let timings = latencies.read();
-    let timings = timings.deref();
     println!("\nMedian timings by span:");
     for (_, v) in timings.iter() {
         let median_total_time = v.total_time.value_at_quantile(0.5);

@@ -21,9 +21,9 @@ use std::{
 };
 use tracing::{
     callsite::Identifier,
-    info, instrument, span,
+    info, instrument,
     subscriber::{Interest, Subscriber},
-    warn, Id, Level, Metadata,
+    warn, Id, Instrument, Metadata,
 };
 use tracing_core::span::Attributes;
 use tracing_subscriber::{
@@ -241,7 +241,7 @@ pub fn measure_latencies(f: impl FnOnce() -> () + Send) -> Latencies {
     latencies
 }
 
-/// Measures latencies of spans in async function `f`.
+/// Measures latencies of spans in async function `f` running on the [tokio] runtime.
 /// May only be called once per process and will panic if called more than once.
 pub fn measure_latencies_tokio<F>(f: impl FnOnce() -> F + Send) -> Latencies
 where
@@ -263,45 +263,34 @@ async fn f() {
     let mut foo: u64 = 1;
 
     for _ in 0..4 {
-        println!("Before top-level span! macro");
+        println!("Before my_great_span");
 
-        span!(Level::TRACE, "my_great_span", foo_count = &foo)
-            .in_scope(|| async {
-                async {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                    foo += 1;
-                    info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-                    println!("Before lower-level span! macro");
-                    span!(
-                        Level::TRACE,
-                        "my other span",
-                        foo_count = &foo,
-                        baz_count = 5
-                    )
-                    .in_scope(|| async {
-                        tokio::time::sleep(Duration::from_millis(25)).await;
-                        warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
-                    })
-                    .await;
-                }
-                .await
-            })
+        async {
+            thread::sleep(Duration::from_millis(3));
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            foo += 1;
+            info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
+            println!("Before my_other_span");
+            async {
+                thread::sleep(Duration::from_millis(2));
+                tokio::time::sleep(Duration::from_millis(25)).await;
+                warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
+            }
+            .instrument(tracing::trace_span!("my_other_span"))
             .await;
+        }
+        .instrument(tracing::trace_span!("my_great_span"))
+        .await
     }
 }
 
-#[instrument(level = "trace")]
-async fn g() {}
-
-#[instrument(level = "trace")]
-async fn h() {}
-
-#[tokio::main]
-async fn main() {
-    let latencies = measure_latencies_tokio(f);
+fn main() {
+    let latencies = measure_latencies_tokio(|| async {
+        f().await;
+        f().await;
+    });
 
     latencies.print_mean_timings();
-    // println!("latencies.read(): {:?}", latencies.read().deref());
 
     let timings = latencies.read();
     let timings = timings.deref();

@@ -31,9 +31,10 @@ use tracing_subscriber::{
 
 #[derive(Debug)]
 pub struct CallsiteTiming {
-    span_name: String,
-    total_time: SyncHistogram<u64>,
-    active_time: SyncHistogram<u64>,
+    pub callsite_str: String,
+    pub span_name: String,
+    pub total_time: SyncHistogram<u64>,
+    pub active_time: SyncHistogram<u64>,
 }
 
 struct CallsiteRecorder {
@@ -43,7 +44,6 @@ struct CallsiteRecorder {
 
 #[derive(Debug)]
 struct SpanTiming {
-    // callsite: Identifier,
     created_at: Instant,
     entered_at: Instant,
     acc_active_time: u64,
@@ -89,8 +89,8 @@ impl Latencies {
             let total_time_count = v.total_time.len();
             let active_time_count = v.active_time.len();
             println!(
-                "  span_name={}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
-                v.span_name, mean_total_time, total_time_count, mean_active_time,active_time_count
+                "  callsite={}, span_name={}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
+                v.callsite_str, v.span_name, mean_total_time, total_time_count, mean_active_time,active_time_count
             );
         }
     }
@@ -136,6 +136,7 @@ where
 
         let meta_name = meta.name();
         let callsite = meta.callsite();
+        let callsite_str = format!("{}-{}", meta.module_path().unwrap(), meta.line().unwrap());
         let interest = Interest::always();
 
         let mut map = self.0.callsite_timings.write().unwrap();
@@ -149,6 +150,7 @@ where
         map.insert(
             callsite.clone(),
             CallsiteTiming {
+                callsite_str: callsite_str.to_owned(),
                 span_name: meta_name.to_owned(),
                 total_time: hist,
                 active_time: hist2,
@@ -242,33 +244,39 @@ where
     })
 }
 
-#[instrument(level = "trace")]
-async fn f() {
-    let mut foo: u64 = 1;
+mod example {
+    use super::*;
 
-    for _ in 0..4 {
-        println!("Before my_great_span");
+    #[instrument(level = "trace")]
+    pub async fn f() {
+        let mut foo: u64 = 1;
 
-        async {
-            thread::sleep(Duration::from_millis(3));
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            foo += 1;
-            info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-            println!("Before my_other_span");
+        for _ in 0..4 {
+            println!("Before my_great_span");
+
             async {
-                thread::sleep(Duration::from_millis(2));
-                tokio::time::sleep(Duration::from_millis(25)).await;
-                warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
+                thread::sleep(Duration::from_millis(3));
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                foo += 1;
+                info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
+                println!("Before my_other_span");
+                async {
+                    thread::sleep(Duration::from_millis(2));
+                    tokio::time::sleep(Duration::from_millis(25)).await;
+                    warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
+                }
+                .instrument(tracing::trace_span!("my_other_span"))
+                .await;
             }
-            .instrument(tracing::trace_span!("my_other_span"))
-            .await;
+            .instrument(tracing::trace_span!("my_great_span"))
+            .await
         }
-        .instrument(tracing::trace_span!("my_great_span"))
-        .await
     }
 }
 
 fn main() {
+    use example::f;
+
     let latencies = measure_latencies_tokio(|| async {
         f().await;
         f().await;
@@ -284,8 +292,8 @@ fn main() {
         let total_time_count = v.total_time.len();
         let active_time_count = v.active_time.len();
         println!(
-            "  span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
-            v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
+            "  callsite={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
+            v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
         );
     }
 }

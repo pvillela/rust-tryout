@@ -1,6 +1,11 @@
 //! This captures both total and sync timings:
 //! - total timings include suspend time and are based on span creation and closing;
 //! - active timings exclude suspend time and are based on span entry and exit.
+//!
+//! WIP latency_trace: refactored for cleaner implementation with separate thread-local for parents, but
+//! use of thread-local Drop to synchronize with the global state is not reliable and
+//! race conditions between execution of code being measured and SyncHistogram refresh continues to be an
+//! issue.
 
 use hdrhistogram::{
     sync::{Recorder, SyncHistogram},

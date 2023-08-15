@@ -29,6 +29,7 @@ use tracing_subscriber::{
     Layer, Registry,
 };
 
+/// Globally collected information for a callsite.
 #[derive(Debug)]
 pub struct CallsiteTiming {
     pub callsite_str: String,
@@ -37,88 +38,152 @@ pub struct CallsiteTiming {
     pub active_time: SyncHistogram<u64>,
 }
 
-struct CallsiteRecorder {
-    total_time: Recorder<u64>,
-    active_time: Recorder<u64>,
+#[derive(Debug)]
+pub struct CallsiteParent {
+    knows_parent: bool,
+    pub parent: Option<Identifier>,
 }
 
+/// Timings by callsite.
+type Timings = RwLock<HashMap<Identifier, CallsiteTiming>>;
+
+/// Callsite parents.
+/// Separate from [Timings] to avoid locking issues caused by [SyncHistogram].refresh.
+type Parents = RwLock<HashMap<Identifier, CallsiteParent>>;
+
+/// Thread-local information collected for a callsite.
+struct LocalCallsiteInfo {
+    total_time: Recorder<u64>,
+    active_time: Recorder<u64>,
+    knows_parent_callsite: bool,
+    parent_callsite: Option<Identifier>,
+}
+
+struct LocalHolder {
+    local_state: RefCell<HashMap<Identifier, LocalCallsiteInfo>>,
+    parents_ref: RefCell<Option<Arc<Parents>>>,
+}
+
+/// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
     created_at: Instant,
     entered_at: Instant,
     acc_active_time: u64,
+    parent_callsite: Option<Identifier>,
 }
 
-/// Collects counts emitted by application spans and events.
-#[derive(Debug)]
-struct Timings {
-    callsite_timings: RwLock<HashMap<Identifier, CallsiteTiming>>,
-}
+/// Provides access a [Timings] containing the latencies collected for different span callsites.
+#[derive(Clone)]
+pub struct Latencies(Arc<Timings>, Arc<Parents>);
 
-pub struct Latencies(Arc<Timings>);
-
-impl Clone for Latencies {
-    fn clone(&self) -> Self {
-        Latencies(self.0.clone())
+impl Drop for LocalHolder {
+    fn drop(&mut self) {
+        println!(
+            ">>>>>>> drop called for thread {:?}",
+            thread::current().id()
+        );
+        let parents = self.parents_ref.borrow();
+        let parents = parents.as_ref().unwrap();
+        let mut parents = parents.write().unwrap();
+        println!(">>>>>>> lock obtained");
+        for (callsite, local_info) in self.local_state.borrow().iter() {
+            parents.entry(callsite.clone()).or_insert(CallsiteParent {
+                knows_parent: true,
+                parent: local_info.parent_callsite.clone(),
+            });
+            let mut parent = parents.get_mut(callsite).unwrap();
+            println!("parent={:?}", parent);
+            if !parent.knows_parent {
+                parent.knows_parent = true;
+                parent.parent = local_info.parent_callsite.clone();
+            }
+            println!("parent={:?}", parent);
+        }
+        println!(
+            ">>>>>>> drop completed for thread {:?}",
+            thread::current().id()
+        );
     }
+}
+
+thread_local! {
+    static LOCAL_HOLDER: LocalHolder = LocalHolder { local_state: RefCell::new(HashMap::new()), parents_ref: RefCell::new(None) };
 }
 
 impl Latencies {
     pub fn new() -> Latencies {
-        let timing_by_span = RwLock::new(HashMap::new());
-        let timings = Timings {
-            callsite_timings: timing_by_span,
-        };
-        Latencies(Arc::new(timings))
+        let timings = RwLock::new(HashMap::new());
+        let parents = RwLock::new(HashMap::new());
+        Latencies(Arc::new(timings), Arc::new(parents))
     }
 
-    pub fn read<'a>(&'a self) -> impl Deref<Target = HashMap<Identifier, CallsiteTiming>> + 'a {
-        for (_, v) in self.0.callsite_timings.write().unwrap().iter_mut() {
-            v.total_time.refresh();
-            v.active_time.refresh();
+    pub fn read(
+        &self,
+        f: impl FnOnce(&HashMap<Identifier, CallsiteTiming>, &HashMap<Identifier, CallsiteParent>),
+    ) {
+        for (_, v) in self.0.write().unwrap().iter_mut() {
+            v.total_time.refresh_timeout(Duration::from_millis(60000));
+            v.active_time.refresh_timeout(Duration::from_millis(60000));
         }
-        self.0.callsite_timings.read().unwrap()
+        f(
+            self.0.read().unwrap().deref(),
+            self.1.read().unwrap().deref(),
+        );
     }
 
     pub fn print_mean_timings(&self) {
-        let timings = self.read();
-        println!("\nMean timing values by span:");
-        for (_, v) in timings.iter() {
-            let mean_total_time = v.total_time.mean();
-            let mean_active_time = v.active_time.mean();
-            let total_time_count = v.total_time.len();
-            let active_time_count = v.active_time.len();
-            println!(
-                "  callsite={}, span_name={}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
-                v.callsite_str, v.span_name, mean_total_time, total_time_count, mean_active_time,active_time_count
-            );
-        }
+        self.read(|timings, parents| {
+            println!("\nMean timing values by span:");
+
+            for (callsite, v) in timings.iter() {
+                let mean_total_time = v.total_time.mean();
+                let mean_active_time = v.active_time.mean();
+                let total_time_count = v.total_time.len();
+                let active_time_count = v.active_time.len();
+                let parent = &parents.get(callsite).unwrap().parent;
+                println!(
+                    "  callsite={:?}, parent={:?}, callsite_str={}, span_name={}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
+                    callsite, parent, v.callsite_str, v.span_name, mean_total_time, total_time_count, mean_active_time,active_time_count
+                );
+            }
+        });
     }
 
-    fn with_recorder(&self, id: &Identifier, f: impl Fn(&mut CallsiteRecorder) -> ()) {
-        thread_local! {
-            static RECORDERS: RefCell<HashMap<Identifier, CallsiteRecorder>> = RefCell::new(HashMap::new());
-        }
+    fn ensure_local_parents(&self) {
+        LOCAL_HOLDER.with(|lh| {
+            let mut x = lh.parents_ref.borrow_mut();
+            if x.is_none() {
+                *x = Some(self.1.clone());
+            }
+        });
+    }
 
-        RECORDERS.with(|m| {
-            let mut callsite_recorders = m.borrow_mut();
-            let mut recorder = callsite_recorders.entry(id.clone()).or_insert_with(|| {
-                println!(
+    fn with_recorder(&self, callsite: &Identifier, f: impl Fn(&mut LocalCallsiteInfo) -> ()) {
+        LOCAL_HOLDER.with(|lh| {
+            let local_state = &lh.local_state;
+            let mut callsite_recorders = local_state.borrow_mut();
+            let mut local_info = callsite_recorders
+                .entry(callsite.clone())
+                .or_insert_with(|| {
+                    println!(
                     "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
-                    id,
+                    callsite,
                     thread::current().id()
                 );
 
-                let callsite_timings = self.0.callsite_timings.read().unwrap();
-                let callsite_timing = callsite_timings.get(&id).unwrap();
+                    let callsite_timings = self.0.read().unwrap();
+                    let callsite_timing = callsite_timings.get(&callsite).unwrap();
 
-                CallsiteRecorder {
-                    total_time: callsite_timing.total_time.recorder(),
-                    active_time: callsite_timing.active_time.recorder(),
-                }
-            });
+                    LocalCallsiteInfo {
+                        total_time: callsite_timing.total_time.recorder(),
+                        active_time: callsite_timing.active_time.recorder(),
+                        knows_parent_callsite: false,
+                        parent_callsite: None,
+                    }
+                });
 
-            f(&mut recorder);
+            f(&mut local_info);
         });
     }
 }
@@ -134,12 +199,14 @@ where
             return Interest::never();
         }
 
+        self.ensure_local_parents();
+
         let meta_name = meta.name();
         let callsite = meta.callsite();
         let callsite_str = format!("{}-{}", meta.module_path().unwrap(), meta.line().unwrap());
         let interest = Interest::always();
 
-        let mut map = self.0.callsite_timings.write().unwrap();
+        let mut map = self.0.write().unwrap();
 
         let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 1000, 1).unwrap();
         hist.auto(true);
@@ -168,10 +235,14 @@ where
     fn on_new_span(&self, _attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         //println!("`new_span` entered");
         let span = ctx.span(id).unwrap();
+        let parent_span = span.parent();
+        let parent_callsite = parent_span.map(|span_ref| span_ref.metadata().callsite());
+
         span.extensions_mut().insert(SpanTiming {
             created_at: Instant::now(),
             entered_at: Instant::now(),
             acc_active_time: 0,
+            parent_callsite,
         });
         //println!("`new_span` executed with id={:?}", id);
     }
@@ -207,6 +278,10 @@ where
                 .record((Instant::now() - span_timing.created_at).as_micros() as u64)
                 .unwrap();
             r.active_time.record(span_timing.acc_active_time).unwrap();
+            if !r.knows_parent_callsite {
+                r.knows_parent_callsite = true;
+                r.parent_callsite = span_timing.parent_callsite.clone();
+            }
         });
 
         //println!("`try_close` executed for span id {:?}", id);
@@ -284,16 +359,18 @@ fn main() {
 
     latencies.print_mean_timings();
 
-    let timings = latencies.read();
-    println!("\nMedian timings by span:");
-    for (_, v) in timings.iter() {
-        let median_total_time = v.total_time.value_at_quantile(0.5);
-        let median_active_time = v.active_time.value_at_quantile(0.5);
-        let total_time_count = v.total_time.len();
-        let active_time_count = v.active_time.len();
-        println!(
-            "  callsite={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
-            v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
-        );
-    }
+    // let timings = latencies.read();
+    // println!("\nMedian timings by span:");
+    // for (callsite, v) in timings.iter() {
+    //     let median_total_time = v.total_time.value_at_quantile(0.5);
+    //     let median_active_time = v.active_time.value_at_quantile(0.5);
+    //     let total_time_count = v.total_time.len();
+    //     let active_time_count = v.active_time.len();
+    //     println!(
+    //         "  callsite_id={:?}, parent_callsite={:?}, callsite_str={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
+    //         callsite, v.parent, v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
+    //         // "  callsite_str={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
+    //         //  v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
+    //     );
+    // }
 }

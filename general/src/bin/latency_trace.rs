@@ -42,21 +42,16 @@ pub struct CallsiteTiming {
 }
 
 /// Timings by callsite.
-type Timings = RwLock<HashMap<Identifier, CallsiteTiming>>;
+type Timings = HashMap<Identifier, CallsiteTiming>;
 
 /// Callsite parents.
 /// Separate from [Timings] to avoid locking issues caused by [SyncHistogram].refresh.
-type Parents = RwLock<HashMap<Identifier, Option<Identifier>>>;
+type Parents = HashMap<Identifier, Option<Identifier>>;
 
 /// Thread-local information collected for a callsite.
 struct LocalCallsiteTiming {
     total_time: Recorder<u64>,
     active_time: Recorder<u64>,
-}
-
-struct LocalHolderOfParentInfo {
-    global_ref: RefCell<Option<Arc<Parents>>>,
-    local_info: RefCell<HashMap<Identifier, Option<Identifier>>>,
 }
 
 /// Information about a span stored in the registry.
@@ -70,16 +65,16 @@ struct SpanTiming {
 
 /// Provides access a [Timings] containing the latencies collected for different span callsites.
 #[derive(Clone)]
-pub struct Latencies(Arc<Timings>, Arc<Parents>);
+pub struct Latencies {
+    timings: Arc<RwLock<Timings>>,
+    parents: Arc<RwLock<Parents>>,
+}
 
 //=================
 // Thread-locals
 
 thread_local! {
-    static LOCAL_HOLDER_OF_PARENT_INFO: LocalHolderOfParentInfo = LocalHolderOfParentInfo {
-        global_ref: RefCell::new(None),
-        local_info: RefCell::new(HashMap::new()),
-    };
+    static LOCAL_PARENT_INFO: RefCell<Parents> = RefCell::new(HashMap::new());
 }
 
 thread_local! {
@@ -89,53 +84,18 @@ thread_local! {
 //=================
 // impls
 
-impl Drop for LocalHolderOfParentInfo {
-    fn drop(&mut self) {
-        println!(
-            ">>>>>>> drop called for thread {:?}",
-            thread::current().id()
-        );
-        let global_parents = self.global_ref.borrow();
-        let global_parents = global_parents.as_ref();
-        if global_parents.is_none() {
-            return;
-        }
-        let mut global_parents = global_parents.unwrap().write().unwrap();
-        println!(
-            ">>>>>>> lock obtained on thread {:?}",
-            thread::current().id()
-        );
-        for (callsite, parent) in self.local_info.borrow().iter() {
-            global_parents
-                .entry(callsite.clone())
-                .or_insert_with(|| parent.clone());
-        }
-
-        // TODO: remove this experiment
-        let sleep_millis = 5_000;
-        println!(
-            "thread {:?} will sleep for {} millis",
-            thread::current().id(),
-            sleep_millis
-        );
-        thread::sleep(Duration::from_millis(sleep_millis));
-
-        println!(
-            ">>>>>>> drop completed for thread {:?}",
-            thread::current().id()
-        );
-    }
-}
-
 impl Latencies {
     pub fn new() -> Latencies {
         let timings = RwLock::new(HashMap::new());
         let parents = RwLock::new(HashMap::new());
-        Latencies(Arc::new(timings), Arc::new(parents))
+        Latencies {
+            timings: Arc::new(timings),
+            parents: Arc::new(parents),
+        }
     }
 
     fn refresh(&self) {
-        for (_, v) in self.0.write().unwrap().iter_mut() {
+        for (_, v) in self.timings.write().unwrap().iter_mut() {
             v.total_time.refresh();
             v.active_time.refresh();
         }
@@ -146,8 +106,8 @@ impl Latencies {
         f: impl FnOnce(&HashMap<Identifier, CallsiteTiming>, &HashMap<Identifier, Option<Identifier>>),
     ) {
         f(
-            self.0.read().unwrap().deref(),
-            self.1.read().unwrap().deref(),
+            self.timings.read().unwrap().deref(),
+            self.parents.read().unwrap().deref(),
         );
     }
 
@@ -169,19 +129,52 @@ impl Latencies {
         });
     }
 
-    fn ensure_globacl_parents_ref(&self) {
-        LOCAL_HOLDER_OF_PARENT_INFO.with(|lh| {
-            let mut x = lh.global_ref.borrow_mut();
-            if x.is_none() {
-                *x = Some(self.1.clone());
+    fn update_parent_info(&self, callsite: &Identifier, parent: &Option<Identifier>) {
+        println!(
+            "entered `update_parent_info`for callsite id {:?} on thread {:?}",
+            callsite,
+            thread::current().id()
+        );
+        LOCAL_PARENT_INFO.with(|parents_cell| {
+            let mut parents = parents_cell.borrow_mut();
+            if parents.contains_key(callsite) {
+                // Both local and global parents info are good for this callsite.
+                return;
             }
-        });
-    }
 
-    fn update_local_parent_info(&self, callsite: &Identifier, parent: &Option<Identifier>) {
-        LOCAL_HOLDER_OF_PARENT_INFO.with(|lh| {
-            let mut x = lh.local_info.borrow_mut();
-            x.entry(callsite.clone()).or_insert(parent.clone());
+            // Update local parents
+            {
+                parents.insert(callsite.clone(), parent.clone());
+            }
+
+            // Update global parents
+            {
+                println!(
+                    "`update_parent_info`getting read lock for callsite id {:?} on thread {:?}",
+                    callsite,
+                    thread::current().id()
+                );
+                let parents = self.parents.as_ref().read().unwrap();
+                if !parents.contains_key(callsite) {
+                    drop(parents); // need to get write lock below;
+                    println!(
+                        "`update_parent_info`getting write lock for callsite id {:?} on thread {:?}",
+                        callsite,
+                        thread::current().id()
+                    );
+                    let mut parents = self.parents.as_ref().write().unwrap();
+                    println!(
+                        "`update_parent_info`got write lock for callsite id {:?} on thread {:?}",
+                        callsite,
+                        thread::current().id()
+                    );
+                    // Situation may have changed while waiting for write lock
+                    if parents.contains_key(callsite) {
+                        return;
+                    }
+                    parents.insert(callsite.clone(), parent.clone());
+                }
+            }
         });
     }
 
@@ -196,12 +189,12 @@ impl Latencies {
                 .entry(callsite.clone())
                 .or_insert_with(|| {
                     println!(
-                    "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
-                    callsite,
-                    thread::current().id()
-                );
+                        "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
+                        callsite,
+                        thread::current().id()
+                    );
 
-                    let callsite_timings = self.0.read().unwrap();
+                    let callsite_timings = self.timings.read().unwrap();
                     let callsite_timing = callsite_timings.get(&callsite).unwrap();
 
                     LocalCallsiteTiming {
@@ -211,7 +204,12 @@ impl Latencies {
                 });
 
             f(&mut local_info);
-        });
+            println!(
+                "***** exiting with_local_callsite_info for callsite={:?} on thread={:?}",
+                callsite,
+                thread::current().id()
+            );
+});
     }
 }
 
@@ -226,14 +224,12 @@ where
             return Interest::never();
         }
 
-        self.ensure_globacl_parents_ref();
-
         let meta_name = meta.name();
         let callsite = meta.callsite();
         let callsite_str = format!("{}-{}", meta.module_path().unwrap(), meta.line().unwrap());
         let interest = Interest::always();
 
-        let mut map = self.0.write().unwrap();
+        let mut timings = self.timings.write().unwrap();
 
         let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 1000, 1).unwrap();
         hist.auto(true);
@@ -241,7 +237,7 @@ where
         let hist: SyncHistogram<u64> = hist.into();
         let hist2: SyncHistogram<u64> = hist2.into();
 
-        map.insert(
+        timings.insert(
             callsite.clone(),
             CallsiteTiming {
                 callsite_str: callsite_str.to_owned(),
@@ -293,7 +289,7 @@ where
     }
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
-        //println!("entered `try_close` wth span Id {:?}", id);
+        println!("entered `on_close` wth span Id {:?}", id);
 
         let span = ctx.span(&id).unwrap();
         let callsite = span.metadata().callsite();
@@ -307,9 +303,14 @@ where
             r.active_time.record(span_timing.acc_active_time).unwrap();
         });
 
-        self.update_local_parent_info(&callsite, &span_timing.parent_callsite);
+        println!(
+            "`on_close` completed call to with_local_callsite_info for span id {:?}",
+            id
+        );
 
-        //println!("`try_close` executed for span id {:?}", id);
+        self.update_parent_info(&callsite, &span_timing.parent_callsite);
+
+        println!("`on_close` executed for span id {:?}", id);
     }
 }
 

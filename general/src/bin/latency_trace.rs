@@ -2,13 +2,16 @@
 //! - total timings include suspend time and are based on span creation and closing;
 //! - active timings exclude suspend time and are based on span entry and exit.
 
+use env_logger;
 use hdrhistogram::{
     sync::{Recorder, SyncHistogram},
     Histogram,
 };
+use log;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    env::set_var,
     future::Future,
     ops::Deref,
     sync::{Arc, RwLock},
@@ -130,10 +133,10 @@ impl Latencies {
     }
 
     fn update_parent_info(&self, callsite: &Identifier, parent: &Option<Identifier>) {
-        println!(
+        log::debug!(
             "entered `update_parent_info`for callsite id {:?} on thread {:?}",
             callsite,
-            thread::current().id()
+            thread::current().id(),
         );
         LOCAL_PARENT_INFO.with(|parents_cell| {
             let mut parents = parents_cell.borrow_mut();
@@ -149,7 +152,7 @@ impl Latencies {
 
             // Update global parents
             {
-                println!(
+                log::debug!(
                     "`update_parent_info`getting read lock for callsite id {:?} on thread {:?}",
                     callsite,
                     thread::current().id()
@@ -157,13 +160,13 @@ impl Latencies {
                 let parents = self.parents.as_ref().read().unwrap();
                 if !parents.contains_key(callsite) {
                     drop(parents); // need to get write lock below;
-                    println!(
+                    log::debug!(
                         "`update_parent_info`getting write lock for callsite id {:?} on thread {:?}",
                         callsite,
                         thread::current().id()
                     );
                     let mut parents = self.parents.as_ref().write().unwrap();
-                    println!(
+                    log::debug!(
                         "`update_parent_info`got write lock for callsite id {:?} on thread {:?}",
                         callsite,
                         thread::current().id()
@@ -188,7 +191,7 @@ impl Latencies {
             let mut local_info = callsite_recorders
                 .entry(callsite.clone())
                 .or_insert_with(|| {
-                    println!(
+                    log::debug!(
                         "***** thread-loacal CallsiteRecorder created for callsite={:?} on thread={:?}",
                         callsite,
                         thread::current().id()
@@ -204,7 +207,7 @@ impl Latencies {
                 });
 
             f(&mut local_info);
-            println!(
+            log::debug!(
                 "***** exiting with_local_callsite_info for callsite={:?} on thread={:?}",
                 callsite,
                 thread::current().id()
@@ -219,7 +222,7 @@ where
     S: for<'lookup> LookupSpan<'lookup>,
 {
     fn register_callsite(&self, meta: &Metadata<'_>) -> Interest {
-        //println!("`register_callsite` entered");
+        //log::debug!("`register_callsite` entered");
         if !meta.is_span() {
             return Interest::never();
         }
@@ -247,7 +250,7 @@ where
             },
         );
 
-        //println!(
+        //log::debug!(
         //     "`register_callsite` executed with id={:?}, meta_name={}",
         //     callsite, meta_name
         // );
@@ -256,7 +259,7 @@ where
     }
 
     fn on_new_span(&self, _attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        //println!("`new_span` entered");
+        //log::debug!("`new_span` entered");
         let span = ctx.span(id).unwrap();
         let parent_span = span.parent();
         let parent_callsite = parent_span.map(|span_ref| span_ref.metadata().callsite());
@@ -267,29 +270,29 @@ where
             acc_active_time: 0,
             parent_callsite,
         });
-        //println!("`new_span` executed with id={:?}", id);
+        //log::debug!("`new_span` executed with id={:?}", id);
     }
 
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        //println!("entered `enter` wth span Id {:?}", id);
+        //log::debug!("entered `enter` wth span Id {:?}", id);
         let span = ctx.span(id).unwrap();
         let mut ext = span.extensions_mut();
         let span_timing = ext.get_mut::<SpanTiming>().unwrap();
         span_timing.entered_at = Instant::now();
-        //println!("`enter` executed with id={:?}", id);
+        //log::debug!("`enter` executed with id={:?}", id);
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        //println!("entered `exit` wth span Id {:?}", id);
+        //log::debug!("entered `exit` wth span Id {:?}", id);
         let span = ctx.span(id).unwrap();
         let mut ext = span.extensions_mut();
         let span_timing = ext.get_mut::<SpanTiming>().unwrap();
         span_timing.acc_active_time += (Instant::now() - span_timing.entered_at).as_micros() as u64;
-        //println!("`try_close` executed for span id {:?}", id);
+        //log::debug!("`try_close` executed for span id {:?}", id);
     }
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
-        println!("entered `on_close` wth span Id {:?}", id);
+        log::debug!("entered `on_close` wth span Id {:?}", id);
 
         let span = ctx.span(&id).unwrap();
         let callsite = span.metadata().callsite();
@@ -303,14 +306,14 @@ where
             r.active_time.record(span_timing.acc_active_time).unwrap();
         });
 
-        println!(
+        log::debug!(
             "`on_close` completed call to with_local_callsite_info for span id {:?}",
             id
         );
 
         self.update_parent_info(&callsite, &span_timing.parent_callsite);
 
-        println!("`on_close` executed for span id {:?}", id);
+        log::debug!("`on_close` executed for span id {:?}", id);
     }
 }
 
@@ -363,14 +366,14 @@ mod example {
         let mut foo: u64 = 1;
 
         for _ in 0..4 {
-            println!("Before my_great_span");
+            log::debug!("Before my_great_span");
 
             async {
                 thread::sleep(Duration::from_millis(3));
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 foo += 1;
                 info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-                println!("Before my_other_span");
+                log::debug!("Before my_other_span");
                 async {
                     thread::sleep(Duration::from_millis(2));
                     tokio::time::sleep(Duration::from_millis(25)).await;
@@ -388,6 +391,9 @@ mod example {
 fn main() {
     use example::f;
 
+    set_var("RUST_LOG", "debug");
+    env_logger::init();
+
     let latencies = measure_latencies_tokio(|| async {
         let h1 = tokio::spawn(f());
         let h2 = tokio::spawn(f());
@@ -398,13 +404,13 @@ fn main() {
     latencies.print_mean_timings();
 
     // let timings = latencies.read();
-    // println!("\nMedian timings by span:");
+    // log::debug!("\nMedian timings by span:");
     // for (callsite, v) in timings.iter() {
     //     let median_total_time = v.total_time.value_at_quantile(0.5);
     //     let median_active_time = v.active_time.value_at_quantile(0.5);
     //     let total_time_count = v.total_time.len();
     //     let active_time_count = v.active_time.len();
-    //     println!(
+    //     log::debug!(
     //         "  callsite_id={:?}, parent_callsite={:?}, callsite_str={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
     //         callsite, v.parent, v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
     //         // "  callsite_str={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",

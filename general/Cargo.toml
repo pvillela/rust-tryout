@@ -13,12 +13,18 @@ thiserror = "1.0"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-core = "0.1"
+
+# Removed "log" feature to prevent `tracng-log` from being pulled in and causing issues with `env_logger`
 tracing-subscriber = { version = "0.3", default-features = false, features = [
     "smallvec",
     "fmt",
     "ansi",
     "std",
 ] }
+
+# Below line replaced by above
+# tracing-subscriber = "0.3"
+
 hdrhistogram = "7.5"
 log = "0.4"
 env_logger = "0.10"

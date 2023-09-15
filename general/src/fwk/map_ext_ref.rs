@@ -1,44 +1,11 @@
 //! Wrappers for [`HashMap`] and [`BTreeMap`] that provide direct map and filter methods, including the
-//! conversion between these two map types.
+//! conversion between these two map types. The wrappers hold a reference to the wrapped data.
 
+use super::map_iter::{filter, map_entries, map_values};
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
 };
-
-fn map_entries<'a, K, V, K1, V1>(
-    iter: impl Iterator<Item = (&'a K, &'a V)> + 'a,
-    mut f: impl FnMut(&K, &V) -> (K1, V1) + 'a,
-) -> impl Iterator<Item = (K1, V1)> + 'a
-where
-    K: 'a,
-    V: 'a,
-{
-    iter.map(move |(k, v)| f(k, v))
-}
-
-fn map_values<'a, K, V, V1>(
-    iter: impl Iterator<Item = (&'a K, &'a V)> + 'a,
-    mut f: impl FnMut(&V) -> V1 + 'a,
-) -> impl Iterator<Item = (K, V1)> + 'a
-where
-    K: Clone + 'a,
-    V: 'a,
-{
-    iter.map(move |(k, v)| (k.clone(), f(v)))
-}
-
-fn filter<'a, K, V>(
-    iter: impl Iterator<Item = (&'a K, &'a V)> + 'a,
-    mut f: impl FnMut(&K, &V) -> bool + 'a,
-) -> impl Iterator<Item = (K, V)> + 'a
-where
-    K: 'a + Clone,
-    V: 'a + Clone,
-{
-    iter.filter(move |(k, v)| f(k, v))
-        .map(|(k, v)| (k.clone(), v.clone()))
-}
 
 pub struct BTreeMapExt<'a, K, V>(pub &'a BTreeMap<K, V>);
 

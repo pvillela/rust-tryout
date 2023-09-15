@@ -5,11 +5,23 @@ use super::map_iter::{filter, map_entries, map_values};
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
+    fmt::Debug,
     hash::Hash,
     ops::Deref,
 };
 
+#[derive(PartialEq, Eq, Clone)]
 pub struct BTreeMapExt<K, V>(pub BTreeMap<K, V>);
+
+impl<K, V> Debug for BTreeMapExt<K, V>
+where
+    K: Debug,
+    V: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (&self.0 as &dyn Debug).fmt(f)
+    }
+}
 
 impl<K, V> From<BTreeMap<K, V>> for BTreeMapExt<K, V> {
     fn from(value: BTreeMap<K, V>) -> Self {
@@ -30,6 +42,24 @@ impl<K, V> IntoIterator for BTreeMapExt<K, V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a BTreeMapExt<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = <&'a BTreeMap<K, V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a mut BTreeMapExt<K, V> {
+    type Item = (&'a K, &'a mut V);
+    type IntoIter = <&'a mut BTreeMap<K, V> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&mut self.0).into_iter()
     }
 }
 

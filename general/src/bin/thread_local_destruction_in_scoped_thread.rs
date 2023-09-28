@@ -1,5 +1,6 @@
 //! Demonstrates that, on scoped threads that are implicitly joined at the end of the scope,
 //! a thread-local's destructor is not guaranteed to complete before the scope is exited.
+//! Reported bug: https://github.com/rust-lang/rust/issues/116179
 
 use std::{hint::black_box, sync::Mutex, thread, time::Duration};
 

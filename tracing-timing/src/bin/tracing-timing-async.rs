@@ -1,6 +1,5 @@
 //! Example of latency measurement for a simple async function.
 
-use rand_distr::Normal;
 use std::time::Duration;
 use tracing::{dispatcher, instrument, trace, trace_span, Dispatch, Instrument};
 use tracing_timing::{Builder, Histogram, TimingSubscriber};
@@ -35,13 +34,10 @@ async fn g() {
 
 fn main() {
     let s = Builder::default().build(|| Histogram::new_with_bounds(10_000, 1_000_000, 3).unwrap());
-    let sid = s.downcaster();
 
     let d = Dispatch::new(s);
     let d2 = d.clone();
     std::thread::spawn(move || {
-        use rand::prelude::*;
-        let mut rng = thread_rng();
         // let fast = Normal::<f64>::new(100_000.0, 50_000.0).unwrap();
         // let slow = Normal::<f64>::new(500_000.0, 50_000.0).unwrap();
         dispatcher::with_default(&d2, || {

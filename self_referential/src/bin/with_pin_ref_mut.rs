@@ -31,7 +31,7 @@ impl Test {
         &self.a
     }
 
-    fn b(self: &Pin<&mut Self>) -> &String {
+    fn b<'a>(self: &Pin<&'a mut Self>) -> &'a String {
         unsafe { &*(self.b) }
     }
 

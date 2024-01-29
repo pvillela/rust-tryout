@@ -1,6 +1,6 @@
 //! This submodule demonstrates the ***abstract methods*** pattern (see [parent module](super)).
 //!
-//! The example below shows how abstract methods can be implemented as function fields on structs
+//! The example in this module shows how abstract methods can be implemented as function fields on structs
 //! and abstract fields can be implemented as a field with a discriminant trait as its type.
 //! The implementations of abstract methods can use both concrete and abstract fields.
 

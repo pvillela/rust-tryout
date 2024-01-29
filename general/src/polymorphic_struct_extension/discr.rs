@@ -1,4 +1,7 @@
 //! This submodule demonstrates the ***discriminated inheritance*** pattern (see [parent module](super)).
+//!
+//! This involves using a trait (the discriminator) that is taken as a struct
+//! parameter and having different `impls` of the struct for different implementations of the discriminator trait.
 
 use std::marker::PhantomData;
 

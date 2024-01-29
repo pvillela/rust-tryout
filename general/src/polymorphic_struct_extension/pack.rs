@@ -1,4 +1,10 @@
 //! This submodule demonstrates the ***parameter packing*** pattern (see [parent module](super)).
+//!
+//! The examples in this module show how a trait can be used to package together multiple type parameters,
+//! making some parameterized structs easier to work with.
+//!
+//! Submodule [`a`] shows an example of a struct with multiple interrelated type parameters, while submodule [`b`]
+//! shows the same example modified to use parameter packing.
 
 use arc_swap::{ArcSwap, ArcSwapAny};
 use std::{
@@ -37,6 +43,7 @@ impl<I: Clone> InnerMut<I> for RefCell<I> {
     }
 }
 
+/// Submodule without parameter packing.
 pub mod a {
     use super::*;
 
@@ -93,6 +100,7 @@ pub mod a {
     }
 }
 
+/// Submodule with parameter packing.
 pub mod b {
     use super::*;
 

@@ -1,10 +1,12 @@
 //! Demonstrates the use of the [`thread_local`] crate with static variables.
+//! This is a proof of concept but is not useful in practice.
+//!
+//! See the `tlcr` module in my `thread_local_collect` library, which demonstrates the use of the
+//! [`thread_local`] crate as an alternative to static variables. That module can be used, for example,
 //! This use case is useful when the spawning of threads is not under our control.
-//! That is the case, for example, with tracing instrumentation libraries, where the spawning of threads is under
+//! with tracing instrumentation libraries, where the spawning of threads is under
 //! the control of the code being instrumented and the scope within which the instrumentation code executes
 //! may be deeply nested in the instrumented code.
-//!
-//! Keep in mind, however, that my `thread-local-collect` library may be a simpler solution for this use case.
 
 use std::{
     cell::RefCell,

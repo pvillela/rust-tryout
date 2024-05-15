@@ -12,6 +12,7 @@ fn main() {
     println!("Execution completed.");
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 struct Foo(String);
 

@@ -3,6 +3,7 @@
 
 use std::{rc::Rc, sync::Arc};
 
+#[allow(unused)]
 #[derive(Debug)]
 struct Foo(u32);
 

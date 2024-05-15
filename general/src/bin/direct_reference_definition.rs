@@ -2,6 +2,7 @@
 //! is dropped when the reference goes out of scope. Calling [`Drop::drop`] on a reference has no effect
 //! and produces a warning.
 
+#[allow(unused)]
 #[derive(Debug)]
 struct Foo(u32);
 

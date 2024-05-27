@@ -1,4 +1,11 @@
-use std::{borrow::Borrow, fmt::Debug, marker::PhantomData, ops::Deref, rc::Rc, sync::Arc};
+use std::{
+    borrow::Borrow,
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+    sync::Arc,
+};
 
 //=================
 // Wrapper
@@ -36,6 +43,12 @@ impl<T, P> Deref for Wrapper<T, P> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T, P> DerefMut for Wrapper<T, P> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }
 

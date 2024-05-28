@@ -1,7 +1,11 @@
 //! Demonstrates that scoped thread implicit join fails 'happens before' guarantee.
 //! Reported bug: https://github.com/rust-lang/rust/issues/116237
 
-use std::{hint::black_box, mem::replace, thread};
+use std::{
+    hint::black_box,
+    ptr::{addr_of, addr_of_mut, replace},
+    thread,
+};
 
 static mut CONTROL: Option<String> = None;
 
@@ -19,7 +23,7 @@ fn main() {
             });
 
             // SAFETY: this happens after the thread join, which provides a `happens before` guarantee
-            let v = unsafe { &CONTROL };
+            let v = unsafe { addr_of!(CONTROL) };
             black_box(format!("{:?}", v));
             print!(".");
         }
@@ -40,7 +44,7 @@ fn main() {
             });
 
             // SAFETY: this happens after the implicit thread join, which should provide a `happens before` guarantee
-            let v = unsafe { &CONTROL };
+            let v = unsafe { addr_of!(CONTROL) };
             black_box(format!("{:?}", v));
             print!(".");
         }
@@ -53,7 +57,7 @@ struct Foo(());
 impl Drop for Foo {
     fn drop(&mut self) {
         // SAFETY: this happens before the thread join, which provides a `happens before` guarantee
-        let _: Option<String> = unsafe { replace(&mut CONTROL, Some("abcd".to_owned())) };
+        let _: Option<String> = unsafe { replace(addr_of_mut!(CONTROL), Some("abcd".to_owned())) };
     }
 }
 

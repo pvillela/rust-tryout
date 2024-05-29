@@ -6,4 +6,4 @@ pub mod map_ext_owned;
 pub mod map_ext_ref;
 pub mod map_iter;
 pub mod wrapper;
-pub mod wrapper_simplified;
+pub mod wrapper_discr;

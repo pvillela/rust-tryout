@@ -10,14 +10,16 @@ fn f_ref<T: Debug>(x: &T) {
     println!("{:?}", x);
 }
 
-fn f_as_ref<T: Debug, U: AsRef<T>>(x: U) {
+fn f_as_ref<T: Debug, U: AsRef<T> + Debug>(x: U) {
     let y = x.as_ref();
     println!("{:?}", y);
+    f_ref(&x);
 }
 
-fn f_deref<T: Debug + Clone, U: Deref<Target = T>>(x: U) {
+fn f_deref<T: Debug + Clone, U: Deref<Target = T> + Debug>(x: U) {
     let y = (*x).clone();
     println!("{:?}", y);
+    f_ref(&x);
 }
 
 fn f_borrow<T: Debug + Clone, U: Borrow<T>>(x: U) {
@@ -32,9 +34,20 @@ fn f_borrow_mut<T: Debug + Clone, U: BorrowMut<T>>(mut x1: U, x2: U) {
     println!("{:?}", y);
 }
 
+fn f_ref_ref<T: Debug>(x: &T) {
+    f_ref::<T>(x);
+    f_ref::<T>(&x);
+}
+
 fn f_ref_arc<T: Debug>(x: Arc<T>) {
     f_ref(&x)
 }
+
+// None of the lines in fn below compile.
+// fn f_as_ref_ref<T: Debug>(x: &T) {
+//     f_as_ref(x);
+//     f_as_ref(&x);
+// }
 
 fn f_as_ref_arc<T: Debug>(x: Arc<T>) {
     f_as_ref(x);
@@ -79,6 +92,8 @@ fn main() {
     let x2 = "bar".to_owned();
     let a1 = Arc::new(x1.clone());
     let r1 = Rc::new(x1.clone());
+
+    f_ref_ref(&x1);
 
     f_ref_arc(a1.clone());
     f_as_ref_arc(a1.clone());

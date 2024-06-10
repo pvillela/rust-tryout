@@ -9,6 +9,7 @@ use std::{
 use thread_local_drop::{Control, Holder};
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 struct Foo(String);
 
 type Data = HashMap<u32, Foo>;

@@ -13,6 +13,7 @@ use std::{
 };
 
 #[derive(Debug)]
+#[allow(unused)]
 struct Foo(String);
 
 static GLOBAL_DROP_CONTROL: OnceLock<Mutex<HashMap<ThreadId, usize>>> = OnceLock::new();

@@ -39,6 +39,10 @@ fn f_ref_ref<T: Debug>(x: &T) {
     f_ref::<T>(&x);
 }
 
+fn f_deref_ref<T: Debug + Clone>(x: &T) {
+    f_deref(x)
+}
+
 fn f_ref_arc<T: Debug>(x: Arc<T>) {
     f_ref(&x)
 }
@@ -94,6 +98,7 @@ fn main() {
     let r1 = Rc::new(x1.clone());
 
     f_ref_ref(&x1);
+    f_deref_ref(&x1);
 
     f_ref_arc(a1.clone());
     f_as_ref_arc(a1.clone());

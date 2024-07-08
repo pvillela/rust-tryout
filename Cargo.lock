@@ -1515,6 +1515,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_my_published_crates"
+version = "0.1.0"
+dependencies = [
+ "thread_local_collect",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1551,6 +1558,16 @@ checksum = "8b9ef9bad013ada3808854ceac7b46812a6465ba368859a37e2100283d2d719c"
 dependencies = [
  "cfg-if",
  "once_cell",
+]
+
+[[package]]
+name = "thread_local_collect"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2f4f31ba09db5417445461dc6ced97c54122be2e2460657b965e0162aa13ddd"
+dependencies = [
+ "log",
+ "thiserror",
 ]
 
 [[package]]

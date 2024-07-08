@@ -7,6 +7,8 @@ type Timing = Histogram<u64>;
 fn main() {
     // CreationError
     {
+        println!("***** CreationError");
+
         let low_is_zero = Timing::new_with_bounds(0, 10, 1);
         println!("{low_is_zero:?}");
 
@@ -34,6 +36,8 @@ fn main() {
 
     // RecordError
     {
+        println!("\n***** RecordError");
+
         let mut hist = Timing::new_with_bounds(1, 10, 3).unwrap();
         println!("hist.is_auto_resize()={}", hist.is_auto_resize());
         let value_out_of_range_resize_disabled = hist.record(10000);
@@ -51,11 +55,18 @@ fn main() {
 
     // AdditionError
     {
+        println!("\n***** AdditionError");
+
         let mut hist = Timing::new_with_bounds(1, 10, 3).unwrap();
         println!("hist.is_auto_resize()={}", hist.is_auto_resize());
+        println!(
+            "hist.high()={}, hist.sigfig()={}",
+            hist.high(),
+            hist.sigfig()
+        );
 
-        let mut hist2 = Timing::new_with_bounds(1, 10000, 3).unwrap();
-        hist2.record(10000).unwrap();
+        let mut hist2 = Timing::new_with_bounds(1, u64::MAX, 5).unwrap();
+        hist2.record(u64::MAX).unwrap();
 
         let other_addend_value_exceeds_range = hist.add(hist2.clone());
         println!("{other_addend_value_exceeds_range:?}");
@@ -65,6 +76,11 @@ fn main() {
         println!(
             "other_addend_value_exceeds_range.is_err()={}",
             other_addend_value_exceeds_range.is_err()
+        );
+        println!(
+            "hist.high()={}, hist.sigfig()={}",
+            hist.high(),
+            hist.sigfig()
         );
 
         // ResizeFailedUsizeTypeTooSmall can't happen when usize is 64 bits.

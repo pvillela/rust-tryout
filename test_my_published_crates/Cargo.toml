@@ -6,4 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread_local_collect = { version = "0.5", features = ["tlcr"] }
+thread_local_collect = { version = "1.0", features = ["tlcr"] }
+latency_trace = { version = "0.5", features = ["tokio"] }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"

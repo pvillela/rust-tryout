@@ -326,6 +326,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "414dcefbc63d77c526a76b3afcf6fbb9b5e2791c19c3aa2297733208750c6e53"
 
 [[package]]
+name = "base64ct"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -954,6 +960,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4345964bb142484797b161f473a503a434de77149dd8c7427788c6e13379388"
 
 [[package]]
+name = "latency_trace"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5ff07c2b5366871cb531097299ec43ccaf2e615d0b525555291f910f6514aef"
+dependencies = [
+ "base64ct",
+ "hdrhistogram",
+ "log",
+ "sha2",
+ "thread_local_collect",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1430,6 +1452,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.10.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1518,7 +1551,10 @@ dependencies = [
 name = "test_my_published_crates"
 version = "0.1.0"
 dependencies = [
+ "latency_trace",
  "thread_local_collect",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1562,9 +1598,9 @@ dependencies = [
 
 [[package]]
 name = "thread_local_collect"
-version = "0.5.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2f4f31ba09db5417445461dc6ced97c54122be2e2460657b965e0162aa13ddd"
+checksum = "be715f7aae78cf181c8fa15534daca2dc00a47d070a8fe2a7b998f3d2e3a33de"
 dependencies = [
  "log",
  "thiserror",

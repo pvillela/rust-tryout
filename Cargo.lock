@@ -1568,6 +1568,7 @@ checksum = "d2f4f31ba09db5417445461dc6ced97c54122be2e2460657b965e0162aa13ddd"
 dependencies = [
  "log",
  "thiserror",
+ "thread_local",
 ]
 
 [[package]]

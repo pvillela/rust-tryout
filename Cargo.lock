@@ -780,6 +780,7 @@ dependencies = [
  "log",
  "nix",
  "once_cell",
+ "sha2",
  "thiserror",
  "thread_local",
  "tokio",

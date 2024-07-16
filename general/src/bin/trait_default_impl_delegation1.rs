@@ -1,7 +1,5 @@
 //! This example shows how a trait ([`BarABf`]) can have a default implementaion provided by another
 //! trait ([`BarABfBoot`]) and how other code can use that.
-//!
-//! See `trait_default_impl_delegation1` for a more elegant version.
 
 use std::marker::PhantomData;
 
@@ -37,45 +35,43 @@ where
     }
 }
 
-trait FooASflDeps<CTX>: BarABf<CTX> {}
-
-trait FooASflDepsParam {
-    type Deps;
+#[allow(unused)]
+/// This trait is not useful for `Sfl`s but is needed for `Fl`s.
+trait FooASfl<CTX> {
+    fn foo_a_sfl() -> i32;
 }
 
-trait CtxParam {
-    type Ctx;
-}
-
-fn foo_a_sfl_c<P>() -> i32
+/// This trait is not useful for `Sfl`s but is needed for `Fl`s.
+trait FooASflC<CTX>: BarABf<CTX>
 where
-    P: CtxParam + FooASflDepsParam,
-    P::Ctx: CfgSrc,
-    P::Deps: FooASflDeps<P::Ctx>,
+    CTX: CfgSrc,
 {
-    P::Deps::bar_a_bf() + P::Ctx::cfg_src() * 2
+    fn foo_a_sfl_c() -> i32 {
+        Self::bar_a_bf() + CTX::cfg_src() * 2
+    }
 }
 
-struct Deps;
+struct Boot<CTX>(PhantomData<CTX>);
 
-impl<CTX> BarABfBoot<CTX> for Deps where CTX: CfgSrc + T1 {}
-impl<CTX> FooASflDeps<CTX> for Deps where CTX: CfgSrc + T1 {}
-
-struct P<CTX>(PhantomData<CTX>);
-
-impl<CTX> CtxParam for P<CTX> {
-    type Ctx = CTX;
-}
-
-impl<CTX> FooASflDepsParam for P<CTX> {
-    type Deps = Deps;
-}
+impl<CTX> BarABfBoot<CTX> for Boot<CTX> where CTX: CfgSrc + T1 {}
+impl<CTX> FooASflC<CTX> for Boot<CTX> where CTX: CfgSrc + T1 {}
 
 fn foo_a_sfl_boot<CTX>() -> i32
 where
     CTX: CfgSrc + T1,
 {
-    foo_a_sfl_c::<P<CTX>>()
+    Boot::<CTX>::foo_a_sfl_c()
+}
+
+#[allow(unused)]
+/// This trait is not useful for `Sfl`s but is needed for `Fl`s.
+trait FooASflBoot<CTX>
+where
+    CTX: CfgSrc + T1,
+{
+    fn foo_a_sfl_boot() -> i32 {
+        Boot::<CTX>::foo_a_sfl_c()
+    }
 }
 
 struct Ctx;

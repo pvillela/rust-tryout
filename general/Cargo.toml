@@ -29,10 +29,10 @@ hdrhistogram = "7.5"
 log = "0.4"
 env_logger = "0.11"
 
-actix-web = "4"
+actix-web = "4.9"
 nix = { version = "0.29", features = ["process", "signal"] }
 thread_local = "1.1"
 sha2 = "0.10"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 just-convert = "0.1"

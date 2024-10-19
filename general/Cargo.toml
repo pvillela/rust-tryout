@@ -6,10 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actix-web = "4.9"
 anyhow = { version = "1.0", features = ["std"] }
 arc-swap = "1.6.0"
+env_logger = "0.11"
+hdrhistogram = "7.5"
+just-convert = "0.1"
+log = "0.4"
+nix = { version = "0.29", features = ["process", "signal"] }
 once_cell = "1.17"
+rand = { version = "0.8", features = ["std_rng"] }
+sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "1.0"
+thread_local = "1.1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-core = "0.1"
@@ -21,18 +32,3 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "ansi",
     "std",
 ] }
-
-# Below line replaced by above
-# tracing-subscriber = "0.3"
-
-hdrhistogram = "7.5"
-log = "0.4"
-env_logger = "0.11"
-
-actix-web = "4.9"
-nix = { version = "0.29", features = ["process", "signal"] }
-thread_local = "1.1"
-sha2 = "0.10"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-just-convert = "0.1"

@@ -765,6 +765,7 @@ dependencies = [
  "log",
  "nix",
  "once_cell",
+ "rand",
  "serde",
  "serde_json",
  "sha2",

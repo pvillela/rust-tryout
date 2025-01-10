@@ -9,6 +9,7 @@ edition = "2021"
 actix-web = "4.9"
 anyhow = { version = "1.0", features = ["std"] }
 arc-swap = "1.6.0"
+distrs = "0.2"
 env_logger = "0.11"
 hdrhistogram = "7.5"
 just-convert = "0.1"
@@ -19,7 +20,8 @@ rand = { version = "0.8", features = ["std_rng"] }
 sha2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-thiserror = "1.0"
+statrs = "0.18"
+thiserror = "2.0"
 thread_local = "1.1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"

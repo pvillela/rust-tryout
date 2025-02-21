@@ -1,4 +1,4 @@
-//! Demonstration of errore returned by methods of [`hdrhistogram::Histogram`].
+//! Demonstration of errors returned by methods of [`hdrhistogram::Histogram`].
 
 use hdrhistogram::Histogram;
 

@@ -25,6 +25,7 @@ fn f_deref<T: Debug + Clone, U: Deref<Target = T> + Debug>(x: U) {
 fn f_borrow<T: Debug + Clone, U: Borrow<T>>(x: U) {
     let y = (*x.borrow()).clone();
     println!("{:?}", y);
+    f_ref(x.borrow());
 }
 
 fn f_borrow_mut<T: Debug + Clone, U: BorrowMut<T>>(mut x1: U, x2: U) {
@@ -32,6 +33,7 @@ fn f_borrow_mut<T: Debug + Clone, U: BorrowMut<T>>(mut x1: U, x2: U) {
     let z = x2.borrow();
     *y = z.clone();
     println!("{:?}", y);
+    f_ref(x1.borrow_mut());
 }
 
 fn f_ref_ref<T: Debug>(x: &T) {

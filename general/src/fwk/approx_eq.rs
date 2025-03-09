@@ -12,7 +12,7 @@ impl ApproxEq for f32 {
 
 impl ApproxEq for f64 {
     fn approx_eq(self, other: Self, epsilon: Self) -> bool {
-        (self - other).abs() <= epsilon
+        (self - other).abs() < epsilon
     }
 }
 

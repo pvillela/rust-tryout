@@ -1,4 +1,7 @@
-//! Demonstration of how the `sigfic` constructor argument impacts values recorded in [`hdrhistogram::Histogram`].
+//! Demonstration of how the `sigfig` constructor argument impacts values recorded in [`hdrhistogram::Histogram`].
+//! - Shows how different values are aliased depending on the `sigfig` used.
+//! - Shows how the `sigfig` impacts the capacity of a non-auto histogram.
+//!
 //! Examples use [`Histogram::new_with_max`], which sets the `low` value to `1`.
 //! Note that a higher `low` value changes the resolution of recorded values in a somewhat unintuitive way.
 
@@ -8,7 +11,10 @@ use hdrhistogram::Histogram;
 
 type Timing = Histogram<u64>;
 
-fn main() -> Result<(), Box<dyn Error>> {
+/// Shows how different values are aliased depending on the `sigfig` used.
+fn data_aliasing() -> Result<(), Box<dyn Error>> {
+    println!("*** low_sigfig example ***");
+
     const MAX_VALUE: u64 = 50;
 
     let mut hist_a = Timing::new_with_max(MAX_VALUE, 1)?;
@@ -49,4 +55,60 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn print_hist_config_stats(name: &str, hist: &Timing) {
+    let distinct = hist.distinct_values();
+    let len = hist.len();
+    let recorded_count = hist.iter_recorded().count();
+    let low = hist.low();
+    let high = hist.high();
+    let min = hist.min();
+    let max = hist.max();
+    let mean = hist.mean();
+    let median = hist.value_at_quantile(0.5);
+    let stdev = hist.stdev();
+    let auto = hist.is_auto_resize();
+    let empty = hist.is_empty();
+    println!("{name}: distinct={distinct}, len={len}, recorded_count={recorded_count}, low={low}, high={high}, min={min}, max={max}, mean={mean}, median={median}, stdev={stdev}, auto={auto}, empty={empty}");
+}
+
+/// Shows how the `sigfig` impacts the capacity of a non-auto histogram.
+fn high_sigfig() {
+    println!("*** high_sigfig example ***");
+
+    const MAX_VALUE: u64 = 10_000_000;
+    const STEP: u64 = 2;
+
+    let z = |high: u64, sigfig: u8| {
+        let mut hist_z = Timing::new_with_max(high, sigfig).unwrap();
+        // let name_new = format!("hist_z_{high}_{sigfig} new");
+        let name = format!("hist_z_{high}_{sigfig}");
+        // print_hist_config_stats(&name_new, &hist_z);
+        for i in 1..=MAX_VALUE / STEP {
+            _ = hist_z.record(i * STEP);
+        }
+        print_hist_config_stats(&name, &hist_z);
+    };
+
+    z(2, 2);
+    z(2, 5);
+    z(10, 2);
+    z(10, 5);
+    z(100, 2);
+    z(100, 5);
+    z(1_000, 2);
+    z(1_000, 5);
+    z(10_000, 2);
+    z(10_000, 5);
+    z(100_000, 2);
+    z(100_000, 5);
+    z(1_000_000, 2);
+    z(1_000_000, 5);
+}
+
+fn main() {
+    data_aliasing().unwrap();
+    println!();
+    high_sigfig();
 }

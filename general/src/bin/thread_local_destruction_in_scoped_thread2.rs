@@ -23,7 +23,7 @@ fn main() {
             });
 
             // SAFETY: this happens after the thread join, which provides a `happens before` guarantee
-            let v = unsafe { addr_of!(CONTROL) };
+            let v = addr_of!(CONTROL);
             black_box(format!("{:?}", v));
             print!(".");
         }
@@ -44,7 +44,7 @@ fn main() {
             });
 
             // SAFETY: this happens after the implicit thread join, which should provide a `happens before` guarantee
-            let v = unsafe { addr_of!(CONTROL) };
+            let v = addr_of!(CONTROL);
             black_box(format!("{:?}", v));
             print!(".");
         }

@@ -31,7 +31,7 @@ fn data_aliasing() -> Result<(), Box<dyn Error>> {
 
     while item_a_opt.is_some() || item_b_opt.is_some() {
         let (value_a, count_a) = match &mut item_a_opt {
-            Some(ref item) => {
+            Some(item) => {
                 let (value_a, count_a) = (item.value_iterated_to(), item.count_at_value());
                 item_a_opt = iter_a.next();
                 (value_a, count_a)
@@ -40,7 +40,7 @@ fn data_aliasing() -> Result<(), Box<dyn Error>> {
         };
 
         let (value_b, count_b) = match &mut item_b_opt {
-            Some(ref item) => {
+            Some(item) => {
                 let (value_b, count_b) = (item.value_iterated_to(), item.count_at_value());
                 item_b_opt = iter_b.next();
                 (value_b, count_b)
@@ -70,7 +70,9 @@ fn print_hist_config_stats(name: &str, hist: &Timing, last_recorded_value: u64) 
     let stdev = hist.stdev();
     let auto = hist.is_auto_resize();
     let empty = hist.is_empty();
-    println!("{name}: distinct={distinct}, len={len}, recorded_count={recorded_count}, last_recorded_value={last_recorded_value}, low={low}, high={high}, min={min}, max={max}, mean={mean}, median={median}, stdev={stdev}, auto={auto}, empty={empty}");
+    println!(
+        "{name}: distinct={distinct}, len={len}, recorded_count={recorded_count}, last_recorded_value={last_recorded_value}, low={low}, high={high}, min={min}, max={max}, mean={mean}, median={median}, stdev={stdev}, auto={auto}, empty={empty}"
+    );
 }
 
 /// Shows how the `sigfig` impacts the capacity of a non-auto histogram.

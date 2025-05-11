@@ -4,8 +4,8 @@
 
 use env_logger;
 use hdrhistogram::{
-    sync::{Recorder, SyncHistogram},
     Histogram,
+    sync::{Recorder, SyncHistogram},
 };
 use log;
 use std::{
@@ -19,17 +19,18 @@ use std::{
     time::{Duration, Instant},
 };
 use tracing::{
+    Id, Instrument, Metadata,
     callsite::Identifier,
     info, instrument,
     subscriber::{Interest, Subscriber},
-    warn, Id, Instrument, Metadata,
+    warn,
 };
 use tracing_core::span::Attributes;
 use tracing_subscriber::{
+    Layer, Registry,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    Layer, Registry,
 };
 
 //=================
@@ -384,7 +385,7 @@ mod example {
 fn main() {
     use example::f;
 
-    set_var("RUST_LOG", "debug");
+    unsafe { set_var("RUST_LOG", "debug") };
 
     let latencies = measure_latencies_tokio(|| async {
         // Set env_logger only if `tracing_subsriber` hasn't pulled in `tracing_log` and already set a logger.

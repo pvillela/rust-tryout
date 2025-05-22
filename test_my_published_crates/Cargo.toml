@@ -7,6 +7,9 @@ edition = "2024"
 
 [dependencies]
 thread_local_collect = { version = "1.0", features = ["tlcr"] }
-latency_trace = { version = "0.5", features = ["tokio"] }
+latency_trace = { version = "0.6", features = ["tokio"] }
+basic_stats = { version = "1.0.0", default-features = false, features = [
+    "aok",
+] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"

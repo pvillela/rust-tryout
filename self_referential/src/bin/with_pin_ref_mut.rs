@@ -27,7 +27,7 @@ impl Test {
         this.b = self_ptr;
     }
 
-    fn a<'a>(self: &'a Pin<&'a mut Self>) -> &str {
+    fn a<'a>(self: &'a Pin<&'a mut Self>) -> &'a str {
         &self.a
     }
 

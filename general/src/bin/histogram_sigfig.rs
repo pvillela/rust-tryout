@@ -1,5 +1,6 @@
 //! Demonstration of how the `sigfig` constructor argument impacts values recorded in [`hdrhistogram::Histogram`].
 //! - Shows how different values are aliased depending on the `sigfig` used.
+//! - Shows how statistics such as the mean can be distorted.
 //! - Shows how the `sigfig` impacts the capacity of a non-auto histogram.
 //!
 //! Examples use [`Histogram::new_with_max`], which sets the `low` value to `1`.
@@ -52,6 +53,14 @@ fn data_aliasing() -> Result<(), Box<dyn Error>> {
             "value_a={}, count_a={}, value_b={}, count_b={}",
             value_a, count_a, value_b, count_b
         );
+    }
+
+    println!("Distortion of means:");
+    {
+        let real_mean = (1. + MAX_VALUE as f64) / 2.;
+        let hist_a_mean = hist_a.mean();
+        let hist_b_mean = hist_b.mean();
+        println!("real_mean={real_mean}, hist_a_mean={hist_a_mean}, hist_b_mean={hist_b_mean}");
     }
 
     Ok(())

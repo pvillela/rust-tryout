@@ -63,22 +63,13 @@ pub fn latency(f: impl FnOnce()) -> Duration {
     Instant::now().duration_since(start)
 }
 
-#[inline(always)]
-fn swap_neighbour(arr: &mut [Duration], i: usize) {
-    if arr[i + 1] < arr[i] {
-        let temp = arr[i];
-        arr[i] = arr[i + 1];
-        arr[i + 1] = temp;
-    }
-}
-
 /// Invokes `f` 3 times and returns the median latency.
 #[inline(always)]
 pub fn latency_m(f: impl Fn()) -> Duration {
     let mut lats = [latency(&f), latency(&f), latency(&f)];
     for k in (0..2).rev() {
         for i in 0..k {
-            swap_neighbour(&mut lats, i);
+            lats.swap(i, i + 1);
         }
     }
     lats[1]
@@ -117,7 +108,7 @@ pub fn busy_work_div(effort: u32) {
     let extent = black_box(effort);
     let mut vf = F;
     for _ in 0..extent {
-        vf = black_box(((M + vf) / (M + 1.) + F) / 2.); // always in the open interval (0.07, 1)
+        vf = black_box(((M - 1. + vf) / M + F) / 2.); // always in the open interval (0.07, 1)
     }
     black_box(vf);
 }

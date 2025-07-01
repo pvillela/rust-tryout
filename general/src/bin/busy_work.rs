@@ -114,12 +114,12 @@ pub fn busy_work_mul(effort: u32) {
 pub fn busy_work_div(effort: u32) {
     const K: f64 = 104729.; // 10,000th prime number
     const M: f64 = 104723.; // 9,999th prime number
-    // 1st 100 decimal digits of pi.
-    const F: f64 = 0.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
+    // 1st 17 decimal digits of pi.
+    const F: f64 = 0.141_592_653_589_793_23;
     let extent = black_box(effort);
     let mut vf = F;
     for _ in 0..extent {
-        vf = ((M + vf) / K + F) / 2.;
+        vf = black_box(((M + vf) / K + F) / 2.); // always in interval (0.07, 1)
     }
     black_box(vf);
 }

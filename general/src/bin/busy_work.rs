@@ -131,9 +131,9 @@ pub fn busy_work_exp(effort: u32) {
 
 /// Returns an estimate of the number of iterations required for `busy_work` to have latency `target_latency`.
 ///
-/// Calls [`calibrate_busy_work_x`] with a predefined default `calibration_effort` of `20_000`;
+/// Calls [`calibrate_busy_work_x`] with a predefined default `calibration_effort` of `200_000`;
 pub fn calibrate_busy_work(busy_work: fn(u32), target_latency: Duration) -> u32 {
-    const CALIBRATION_EFFORT: u32 = 20_000;
+    const CALIBRATION_EFFORT: u32 = 200_000;
     calibrate_busy_work_x(busy_work, target_latency, CALIBRATION_EFFORT)
 }
 

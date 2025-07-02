@@ -1,4 +1,4 @@
 [workspace]
-members = [ "*" ]
-exclude = ["target", ".git", ".idea"]
+members = ["*"]
+exclude = ["out", "target", ".git", ".idea"]
 resolver = "2"

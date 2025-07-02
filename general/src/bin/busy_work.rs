@@ -103,12 +103,11 @@ pub fn busy_work_mul(effort: u32) {
 /// Function that does a significant amount of computation to support validation of benchmarking frameworks.
 /// `effort` is the number of iterations that determines the amount of work performed.
 pub fn busy_work_div(effort: u32) {
-    const M: f64 = 104729.; // 10,000th prime number
-    const F: f64 = 0.141_592_653_589_793_23; // 1st 17 decimal digits of pi
+    const F: f64 = 0.5;
     let extent = black_box(effort);
     let mut vf = F;
     for _ in 0..extent {
-        vf = black_box(((M - 1. + vf) / M + F) / 2.); // always in the open interval (0.07, 1)
+        vf = black_box(((1. + vf) * (1. + vf)).fract());
     }
     black_box(vf);
 }
